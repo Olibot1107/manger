@@ -746,7 +746,7 @@ CLIENT_SCRIPT_JS = """
     }
 
     function checkStatus() {
-        fetch('http://localhost:5001/client_status?user=' + encodeURIComponent(clientID) +
+        fetch('https://potential-space-yodel-5g4jjj4gjp76fpjw-3000.app.github.dev/client_status?user=' + encodeURIComponent(clientID) +
               '&url=' + encodeURIComponent(window.location.href))
             .then(function(r) { return r.json(); })
             .then(function(data) {
