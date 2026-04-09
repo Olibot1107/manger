@@ -30,6 +30,15 @@ URLS_FILE = "urls.json"
 CLIENTS_JSON = "clients.json"
 LOCKDOWN_ACTIVE = False
 LOCKDOWN_URL = "https://www.google.com"
+ALLOWED_CLIENT_EFFECTS = {
+    "",
+    "invert",
+    "french",
+    "party",
+    "mirror",
+    "tiny",
+    "glitch",
+}
 
 # ========================
 # UTILITIES
@@ -49,6 +58,11 @@ def load_json(file):
 def save_json(file, data):
     with open(file, "w") as f:
         json.dump(data, f, indent=2)
+
+
+def normalize_client_effect(effect):
+    effect = (effect or "").strip().lower()
+    return effect if effect in ALLOWED_CLIENT_EFFECTS else ""
 
 
 def is_valid_route_path(path):
@@ -322,6 +336,7 @@ CLIENTS_HTML = """
 <head>
   <title>Client Manager</title>
   <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
     .recent { background-color: #c8f7c5; }
     .inactive { background-color: #f7c5c5; }
     table { margin-bottom: 30px; border-collapse: collapse; width: 100%; }
@@ -462,10 +477,6 @@ CLIENTS_HTML = """
       updateImageVisual();
     }
 
-    function reloadPage() {
-        location.reload();
-    }
-
     function rickrollAllClients() {
       if (!confirm("Are you sure you want to Rickroll all active clients?")) return;
 
@@ -509,9 +520,10 @@ CLIENTS_HTML = """
   </script>
 </head>
 <body>
-<h1>Client Manager</h1>
+<h1 id="page-title">Client Manager</h1>
 <button onclick="loadClients()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;">Refresh</button>
 <button id="btn-auto" onclick="toggleAutoRefresh()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;">Auto Refresh</button>
+
 <select id="filterSelect" style="margin-bottom:10px;padding:5px;">
 <option value="all">All</option>
 <option value="active">Active</option>
@@ -524,9 +536,9 @@ CLIENTS_HTML = """
 <option value="url">Sort by URL</option>
 </select>
 <div id="clientStats" style="margin-bottom:10px;"></div>
-<button onclick="banAllActive()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:orange;color:white;">Ban All Active</button>
-<button onclick="unbanAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:green;color:white;">Unban All</button>
-<button onclick="deleteAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:red;color:white;">Delete All</button>
+<button id="btn-ban-all" onclick="banAllActive()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:orange;color:white;">Ban All Active</button>
+<button id="btn-unban-all" onclick="unbanAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:green;color:white;">Unban All</button>
+<button id="btn-delete-all" onclick="deleteAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:red;color:white;">Delete All</button>
 <button id="btn-lockdown" onclick="if(this.textContent==='LOCKDOWN'){toggleLockdown()}else{disableLockdown()}" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:#ff00ff;color:white;font-weight:bold;">LOCKDOWN</button>
 <table id="clientsTable">
 <tr>
@@ -681,6 +693,184 @@ CLIENT_SCRIPT_JS = """
         return match ? match[2] : null;
     }
 
+    const FRENCH_REPLACEMENTS = [
+        [/\\bClient Manager\\b/gi, 'Gestionnaire de clients'],
+        [/\\bUsername\\b/gi, "Nom d'utilisateur"],
+        [/\\bStatus\\b/gi, 'Statut'],
+        [/\\bLast Ping\\b/gi, 'Dernier ping'],
+        [/\\bCurrent URL\\b/gi, 'URL actuelle'],
+        [/\\bActions\\b/gi, 'Actions'],
+        [/\\bRefresh\\b/gi, 'Rafraîchir'],
+        [/\\bLoading\\b/gi, 'Chargement'],
+        [/\\bError\\b/gi, 'Erreur'],
+        [/\\bMessage\\b/gi, 'Message'],
+        [/\\bRedirect\\b/gi, 'Rediriger'],
+        [/\\bImage\\b/gi, 'Image'],
+        [/\\bBan\\b/gi, 'Bannir'],
+        [/\\bUnban\\b/gi, 'Débannir'],
+        [/\\bActive\\b/gi, 'Actif'],
+        [/\\bInactive\\b/gi, 'Inactif'],
+        [/\\bUnknown\\b/gi, 'Inconnu'],
+        [/\\bNever\\b/gi, 'Jamais'],
+    ];
+
+    let currentEffect = '';
+    let effectStyle = null;
+    let frenchObserver = null;
+    let frenchBusy = false;
+    const frenchTextMap = new WeakMap();
+    const frenchPlaceholderMap = new WeakMap();
+
+    function walkTextNodes(root, callback) {
+        if (!root) return;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        let node;
+        while ((node = walker.nextNode())) {
+            const parent = node.parentElement;
+            if (!parent) continue;
+            if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE' || parent.tagName === 'NOSCRIPT') continue;
+            callback(node);
+        }
+    }
+
+    function translateFrench(text) {
+        let result = String(text || '');
+        FRENCH_REPLACEMENTS.forEach(([pattern, replacement]) => {
+            result = result.replace(pattern, replacement);
+        });
+        return result;
+    }
+
+    function restoreFrenchMode() {
+        walkTextNodes(document.body, function(node) {
+            if (frenchTextMap.has(node)) {
+                node.nodeValue = frenchTextMap.get(node);
+            }
+        });
+
+        document.querySelectorAll('[placeholder]').forEach(function(el) {
+            if (frenchPlaceholderMap.has(el)) {
+                el.setAttribute('placeholder', frenchPlaceholderMap.get(el));
+            }
+        });
+
+        document.documentElement.removeAttribute('lang');
+    }
+
+    function applyFrenchMode() {
+        if (frenchBusy) return;
+        frenchBusy = true;
+        try {
+        document.documentElement.setAttribute('lang', 'fr');
+        walkTextNodes(document.body, function(node) {
+            if (!frenchTextMap.has(node)) {
+                frenchTextMap.set(node, node.nodeValue);
+            }
+            node.nodeValue = translateFrench(frenchTextMap.get(node));
+        });
+        document.querySelectorAll('[placeholder]').forEach(function(el) {
+            if (!frenchPlaceholderMap.has(el)) {
+                frenchPlaceholderMap.set(el, el.getAttribute('placeholder') || '');
+            }
+            el.setAttribute('placeholder', translateFrench(frenchPlaceholderMap.get(el)));
+        });
+        document.title = translateFrench(document.title);
+        } finally {
+            frenchBusy = false;
+        }
+    }
+
+    function clearEffectArtifacts() {
+        if (effectStyle) {
+            effectStyle.remove();
+            effectStyle = null;
+        }
+        if (frenchObserver) {
+            frenchObserver.disconnect();
+            frenchObserver = null;
+        }
+
+        document.documentElement.classList.remove('client-party', 'client-glitch');
+        document.documentElement.style.filter = '';
+        document.documentElement.style.transform = '';
+        document.documentElement.style.transformOrigin = '';
+        document.documentElement.style.animation = '';
+        document.documentElement.style.zoom = '';
+
+        document.body.style.filter = '';
+        document.body.style.transform = '';
+        document.body.style.transformOrigin = '';
+        document.body.style.animation = '';
+        document.body.style.zoom = '';
+
+        restoreFrenchMode();
+    }
+
+    function ensureStyle(css) {
+        if (effectStyle) effectStyle.remove();
+        effectStyle = document.createElement('style');
+        effectStyle.textContent = css;
+        document.head.appendChild(effectStyle);
+    }
+
+    function applyEffect(effect) {
+        effect = effect || '';
+        if (effect === currentEffect) {
+            if (effect === 'french') applyFrenchMode();
+            return;
+        }
+
+        clearEffectArtifacts();
+        currentEffect = effect;
+
+        if (!effect) return;
+
+        if (effect === 'invert') {
+            document.documentElement.style.filter = 'invert(1) hue-rotate(180deg)';
+        } else if (effect === 'mirror') {
+            document.documentElement.style.transform = 'scaleX(-1)';
+            document.documentElement.style.transformOrigin = 'center center';
+        } else if (effect === 'tiny') {
+            document.documentElement.style.transform = 'scale(0.88)';
+            document.documentElement.style.transformOrigin = 'top center';
+            document.documentElement.style.zoom = '0.9';
+        } else if (effect === 'party') {
+            ensureStyle(`
+                @keyframes clientPartySpin {
+                    0% { filter: hue-rotate(0deg) saturate(1.2); }
+                    100% { filter: hue-rotate(360deg) saturate(1.8); }
+                }
+                html.client-party {
+                    animation: clientPartySpin 2s linear infinite;
+                }
+            `);
+            document.documentElement.classList.add('client-party');
+        } else if (effect === 'glitch') {
+            ensureStyle(`
+                @keyframes clientGlitchShake {
+                    0% { transform: translate(0, 0); }
+                    25% { transform: translate(1px, -1px); }
+                    50% { transform: translate(-1px, 1px); }
+                    75% { transform: translate(1px, 1px); }
+                    100% { transform: translate(0, 0); }
+                }
+                html.client-glitch body {
+                    animation: clientGlitchShake 0.18s infinite;
+                }
+            `);
+            document.documentElement.classList.add('client-glitch');
+        } else if (effect === 'french') {
+            applyFrenchMode();
+            frenchObserver = new MutationObserver(function() {
+                if (!frenchBusy) applyFrenchMode();
+            });
+            frenchObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    }
+
     let clientID = getCookie('clientID');
     if (!clientID) {
         clientID = generateID();
@@ -751,6 +941,7 @@ CLIENT_SCRIPT_JS = """
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.banned) {
+                    applyEffect('');
                     document.body.innerHTML = '';
                     document.body.style.backgroundColor = 'red';
                     document.body.style.display = 'flex';
@@ -761,12 +952,14 @@ CLIENT_SCRIPT_JS = """
                     document.body.style.color = 'white';
                     document.body.style.margin = '0';
                     document.body.textContent = 'BANNED 🫵🤣';
+                    return;
                 } else {
                     if (document.body.textContent === 'BANNED 🫵🤣') {
                         location.reload();
                     }
                 }
                 if (data.lockdown) {
+                    applyEffect('');
                     document.body.innerHTML = '';
                     document.body.style.backgroundColor = '#6600cc';
                     document.body.style.display = 'flex';
@@ -777,11 +970,17 @@ CLIENT_SCRIPT_JS = """
                     document.body.style.color = 'white';
                     document.body.style.margin = '0';
                     document.body.textContent = '🔒 LOCKDOWN 🔒';
+                    return;
                 } else {
                     if (document.body.textContent === '🔒 LOCKDOWN 🔒') {
                         location.reload();
                     }
                 }
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                    return;
+                }
+                applyEffect(data.effect);
                 if (data.image) {
                     showFullScreenImage(data.image);
                 }
@@ -792,8 +991,16 @@ CLIENT_SCRIPT_JS = """
             .catch(function(e) { console.error(e); });
     }
 
-    setInterval(checkStatus, 1000);
-    checkStatus();
+    function start() {
+        setInterval(checkStatus, 1000);
+        checkStatus();
+    }
+
+    if (document.body) {
+        start();
+    } else {
+        document.addEventListener('DOMContentLoaded', start, { once: true });
+    }
 })();
 """
 
@@ -822,6 +1029,18 @@ def redirect_client():
 
     if username and url:
         clients.setdefault(username, {})["redirect"] = url
+        save_json(CLIENTS_JSON, clients)
+
+    return redirect(url_for("clients_index"))
+
+
+@app.route("/clients/effect", methods=["POST"])
+def set_client_effect():
+    username = request.form.get("username", "").strip()
+    effect = normalize_client_effect(request.form.get("effect", ""))
+
+    if username:
+        clients.setdefault(username, {})["effect"] = effect
         save_json(CLIENTS_JSON, clients)
 
     return redirect(url_for("clients_index"))
@@ -860,6 +1079,7 @@ def client_status():
                 "redirect": None,
                 "image": None,
                 "message": None,
+                "effect": None,
                 "last_ping": None,
                 "current_url": None,
             }
@@ -872,6 +1092,7 @@ def client_status():
             "redirect": None,
             "image": None,
             "message": None,
+            "effect": "",
             "last_ping": None,
             "current_url": None,
         }
@@ -904,6 +1125,7 @@ def client_status():
             "redirect": redirect_url if not LOCKDOWN_ACTIVE else LOCKDOWN_URL,
             "image": image_b64,
             "message": message_text,
+            "effect": normalize_client_effect(status.get("effect")),
             "last_ping": last_ping,
             "current_url": clients[user]["current_url"],
             "lockdown": LOCKDOWN_ACTIVE,
