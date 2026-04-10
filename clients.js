@@ -28,7 +28,13 @@ var EFFECTS = [
   { value: 'comic', label: 'Comic Mode' },
   { value: 'zoom', label: 'Zoom Pop' },
   { value: 'blur', label: 'Blur' },
-  { value: 'flipv', label: 'Vertical Flip' }
+  { value: 'flipv', label: 'Vertical Flip' },
+  { value: 'neon', label: 'Neon Glow' },
+  { value: 'scanlines', label: 'Scanlines' },
+  { value: 'pulse', label: 'Pulse' },
+  { value: 'skew', label: 'Skew' },
+  { value: 'spin', label: 'Spin' },
+  { value: 'confetti', label: 'Confetti' }
 ];
 
 var FRENCH_REPLACEMENTS = [
@@ -54,7 +60,13 @@ var FRENCH_REPLACEMENTS = [
   [/\bBan\b/gi, 'Bannir'],
   [/\bUnban\b/gi, 'Débannir'],
   [/\bApply Effect\b/gi, 'Appliquer l\'effet'],
-  [/\bReset Effect\b/gi, 'Réinitialiser l\'effet']
+  [/\bReset Effect\b/gi, 'Réinitialiser l\'effet'],
+  [/\bNeon Glow\b/gi, 'Lueur néon'],
+  [/\bScanlines\b/gi, 'Lignes CRT'],
+  [/\bPulse\b/gi, 'Pouls'],
+  [/\bSkew\b/gi, 'Inclinaison'],
+  [/\bSpin\b/gi, 'Rotation'],
+  [/\bConfetti\b/gi, 'Confettis']
 ];
 
 function effectLabel(effect) {
@@ -73,7 +85,13 @@ function effectLabel(effect) {
     comic: 'Comic Mode',
     zoom: 'Zoom Pop',
     blur: 'Blur',
-    flipv: 'Vertical Flip'
+    flipv: 'Vertical Flip',
+    neon: 'Neon Glow',
+    scanlines: 'Scanlines',
+    pulse: 'Pulse',
+    skew: 'Skew',
+    spin: 'Spin',
+    confetti: 'Confetti'
   };
   return map[effect] || 'No Effect';
 }
@@ -159,7 +177,18 @@ function clearEffectArtifacts() {
     frenchObserver = null;
   }
 
-  document.documentElement.classList.remove('client-party', 'client-glitch', 'client-rainbow', 'client-wobble');
+  document.documentElement.classList.remove(
+    'client-party',
+    'client-glitch',
+    'client-rainbow',
+    'client-wobble',
+    'client-neon',
+    'client-scanlines',
+    'client-pulse',
+    'client-skew',
+    'client-spin',
+    'client-confetti'
+  );
   document.documentElement.style.filter = '';
   document.documentElement.style.transform = '';
   document.documentElement.style.transformOrigin = '';
@@ -269,6 +298,71 @@ function applyClientEffect(effect) {
   } else if (effect === 'zoom') {
     document.documentElement.style.transform = 'scale(1.08)';
     document.documentElement.style.transformOrigin = 'top center';
+  } else if (effect === 'neon') {
+    ensureEffectStyle(`
+      @keyframes clientNeonPulse {
+        0% { filter: brightness(1.05) saturate(1.5) hue-rotate(0deg); }
+        100% { filter: brightness(1.25) saturate(2) hue-rotate(360deg); }
+      }
+      html.client-neon body {
+        animation: clientNeonPulse 1.8s ease-in-out infinite alternate;
+      }
+      html.client-neon a, html.client-neon button, html.client-neon input, html.client-neon select {
+        box-shadow: 0 0 12px rgba(0, 255, 255, 0.35);
+      }
+    `);
+    document.documentElement.classList.add('client-neon');
+  } else if (effect === 'scanlines') {
+    ensureEffectStyle(`
+      html.client-scanlines body {
+        background-image:
+          linear-gradient(rgba(255,255,255,0.08) 50%, rgba(0,0,0,0) 50%);
+        background-size: 100% 4px;
+      }
+    `);
+    document.documentElement.classList.add('client-scanlines');
+  } else if (effect === 'pulse') {
+    ensureEffectStyle(`
+      @keyframes clientPulse {
+        0% { transform: scale(1); filter: brightness(1); }
+        50% { transform: scale(1.015); filter: brightness(1.12); }
+        100% { transform: scale(1); filter: brightness(1); }
+      }
+      html.client-pulse body {
+        animation: clientPulse 1.5s ease-in-out infinite;
+      }
+    `);
+    document.documentElement.classList.add('client-pulse');
+  } else if (effect === 'skew') {
+    document.documentElement.style.transform = 'skewX(-5deg)';
+    document.documentElement.style.transformOrigin = 'center center';
+  } else if (effect === 'spin') {
+    ensureEffectStyle(`
+      @keyframes clientSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      html.client-spin body {
+        animation: clientSpin 8s linear infinite;
+      }
+    `);
+    document.documentElement.classList.add('client-spin');
+  } else if (effect === 'confetti') {
+    ensureEffectStyle(`
+      @keyframes clientConfetti {
+        0% { background-position: 0 0, 0 0, 0 0; }
+        100% { background-position: 120px 80px, -90px 140px, 200px -100px; }
+      }
+      html.client-confetti body {
+        background-image:
+          radial-gradient(circle, rgba(255,0,0,0.35) 0 2px, transparent 3px),
+          radial-gradient(circle, rgba(0,255,0,0.30) 0 2px, transparent 3px),
+          radial-gradient(circle, rgba(0,128,255,0.30) 0 2px, transparent 3px);
+        background-size: 80px 80px, 120px 120px, 160px 160px;
+        animation: clientConfetti 10s linear infinite;
+      }
+    `);
+    document.documentElement.classList.add('client-confetti');
   } else if (effect === 'french') {
     translateFrenchMode();
     frenchObserver = new MutationObserver(function() {
