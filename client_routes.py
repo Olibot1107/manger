@@ -196,6 +196,37 @@ def register_routes(app, state):
 
         return redirect(url_for("clients_index"))
 
+    @app.route("/clients/<path:subpath>", methods=["POST"])
+    def clients_fallback(subpath):
+        username = request.form.get("username", "").strip()
+        if not username:
+            return redirect(url_for("clients_index"))
+
+        if "note" in request.form:
+            note = request.form.get("note", "").strip()
+            with data_lock:
+                clients.setdefault(username, {})["note"] = note
+                save_json(clients_json_path, clients)
+        elif "effect" in request.form:
+            effect = normalize_client_effect(request.form.get("effect", ""))
+            with data_lock:
+                clients.setdefault(username, {})["effect"] = effect
+                save_json(clients_json_path, clients)
+        elif "message" in request.form:
+            message = request.form.get("message", "").strip()
+            if message:
+                with data_lock:
+                    clients.setdefault(username, {})["message"] = message
+                    save_json(clients_json_path, clients)
+        else:
+            url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get("url", "").strip()
+            if url:
+                with data_lock:
+                    clients.setdefault(username, {})["redirect"] = url
+                    save_json(clients_json_path, clients)
+
+        return redirect(url_for("clients_index"))
+
     @app.route("/help")
     def help_page():
         return render_template_string(HELP_HTML)
