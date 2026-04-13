@@ -2,3 +2,4 @@ Flask
 flask-cors
 psutil
 Werkzeug
+requests

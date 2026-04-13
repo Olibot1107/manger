@@ -12,6 +12,32 @@ var effectStyleNode = null;
 var frenchObserver = null;
 var frenchTextMap = new WeakMap();
 var frenchPlaceholderMap = new WeakMap();
+var requestSeq = 0;
+var refreshTimer = null;
+
+var ROUTE_KEY = 'manger';
+function decodeRoute(hex) {
+  var out = '';
+  for (var i = 0; i < hex.length; i += 2) {
+    var value = parseInt(hex.slice(i, i + 2), 16);
+    var keyCode = ROUTE_KEY.charCodeAt((i / 2) % ROUTE_KEY.length);
+    out += String.fromCharCode(value ^ keyCode);
+  }
+  return out;
+}
+
+var ROUTES = Object.freeze({
+  clientsJson: decodeRoute('4202020e001c1912400d161d03'),
+  clientBan: decodeRoute('4202020e001c19124105041c'),
+  clientUnban: decodeRoute('4202020e001c191241120b100c0f'),
+  clientDelete: decodeRoute('4202020e001c19124103001e08150b'),
+  clientMessage: decodeRoute('4202020e001c1912410a00011e000902'),
+  clientRedirect: decodeRoute('4202020e001c19124115001604130b0411'),
+  clientEffect: decodeRoute('4202020e001c19124102031408021a'),
+  clientImage: decodeRoute('4202020e001c1912410e08130a04'),
+  lockdown: decodeRoute('420d01040e16021600'),
+  lockdownJson: decodeRoute('420d01040e16021600490f01020f')
+});
 
 var EFFECTS = [
   { value: '', label: 'No Effect' },
@@ -442,68 +468,89 @@ function renderClients(clients) {
 }
 
 function loadClients() {
-  fetch('/clients.json').then(r => r.json()).then(renderClients);
+  var current = ++requestSeq;
+  return fetch(ROUTES.clientsJson)
+    .then(function(r) {
+      if (!r.ok) throw new Error('Failed to load clients');
+      return r.json();
+    })
+    .then(function(data) {
+      if (current !== requestSeq) return data;
+      renderClients(data);
+      return data;
+    })
+    .catch(function(err) {
+      console.error(err);
+      if (current === requestSeq) {
+        var stats = document.getElementById('clientStats');
+        if (stats) stats.textContent = 'Unable to load clients';
+      }
+      throw err;
+    });
 }
 
 function banClient(btn) {
   var user = btn.closest('td').getAttribute('data-user');
-  fetch('/clients/ban', {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientBan, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function unbanClient(btn) {
   var user = btn.closest('td').getAttribute('data-user');
-  fetch('/clients/unban', {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientUnban, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function deleteClient(btn) {
   var user = btn.closest('td').getAttribute('data-user');
   if (!confirm('Delete ' + user + '?')) return;
-  fetch('/clients/delete', {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientDelete, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function sendMessage(btn, msg) {
   var user = btn.closest('td').getAttribute('data-user');
   if (!msg) return;
-  fetch('/clients/message', {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&message=' + encodeURIComponent(msg), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientMessage, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&message=' + encodeURIComponent(msg), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function sendRedirect(btn, url) {
   var user = btn.closest('td').getAttribute('data-user');
   if (!url) return;
-  fetch('/clients/redirect', {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function sendEffect(btn, effect) {
   var user = btn.closest('td').getAttribute('data-user');
-  fetch('/clients/effect', {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&effect=' + encodeURIComponent(effect || ''), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientEffect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&effect=' + encodeURIComponent(effect || ''), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function banAllActive() {
   if (!confirm('Ban all active clients?')) return;
-  Object.entries(clientState.clients).forEach(([user, data]) => {
+  Promise.all(Object.entries(clientState.clients).map(function(entry) {
+    var user = entry[0];
+    var data = entry[1];
     if (data.recent && !data.banned) {
-      fetch('/clients/ban', {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+      return fetch(ROUTES.clientBan, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
     }
-  });
-  setTimeout(loadClients, 500);
+    return Promise.resolve();
+  })).then(loadClients);
 }
 
 function unbanAll() {
   if (!confirm('Unban all clients?')) return;
-  Object.entries(clientState.clients).forEach(([user, data]) => {
+  Promise.all(Object.entries(clientState.clients).map(function(entry) {
+    var user = entry[0];
+    var data = entry[1];
     if (data.banned) {
-      fetch('/clients/unban', {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+      return fetch(ROUTES.clientUnban, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
     }
-  });
-  setTimeout(loadClients, 500);
+    return Promise.resolve();
+  })).then(loadClients);
 }
 
 function deleteAll() {
   if (!confirm('Delete ALL clients? This cannot be undone!')) return;
-  Object.keys(clientState.clients).forEach(user => {
-    fetch('/clients/delete', {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
-  });
-  setTimeout(loadClients, 500);
+  Promise.all(Object.keys(clientState.clients).map(function(user) {
+    return fetch(ROUTES.clientDelete, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+  })).then(loadClients);
 }
 
 function toggleAutoRefresh() {
@@ -512,33 +559,40 @@ function toggleAutoRefresh() {
   if (clientState.autoRefresh) {
     btn.textContent = 'Stop Auto';
     btn.style.backgroundColor = 'red';
-    clientState.autoRefreshInterval = setInterval(loadClients, 3000);
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(loadClients, 3000);
   } else {
     btn.textContent = 'Auto Refresh';
     btn.style.backgroundColor = '';
-    clearInterval(clientState.autoRefreshInterval);
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = null;
   }
 }
 
 function toggleLockdown(url) {
   var targetUrl = url || 'https://www.google.com';
-  fetch('/lockdown', {method: 'POST', body: 'action=on&url=' + encodeURIComponent(targetUrl), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(r => r.json()).then(d => {
-    loadClients();
-    updateLockdownBtn();
-  });
+  return fetch(ROUTES.lockdown, {method: 'POST', body: 'action=on&url=' + encodeURIComponent(targetUrl), headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      loadClients();
+      updateLockdownBtn();
+    });
 }
 
 function disableLockdown() {
-  fetch('/lockdown', {method: 'POST', body: 'action=off', headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(r => r.json()).then(d => {
-    loadClients();
-    updateLockdownBtn();
-  });
+  return fetch(ROUTES.lockdown, {method: 'POST', body: 'action=off', headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      loadClients();
+      updateLockdownBtn();
+    });
 }
 
 function updateLockdownBtn() {
-  fetch('/lockdown.json').then(r => r.json()).then(d => {
+  return fetch(ROUTES.lockdownJson).then(function(r) { return r.json(); }).then(function(d) {
     lockdownState.active = !!d.active;
     var btn = document.getElementById('btn-lockdown');
+    if (!btn) return;
     if (d.active) {
       btn.textContent = 'UNLOCK';
       btn.style.backgroundColor = 'green';
@@ -549,42 +603,45 @@ function updateLockdownBtn() {
   });
 }
 
-loadClients();
+loadClients().catch(function() {});
 updateLockdownBtn();
 
-document.getElementById('clientsTable').addEventListener('click', function(e) {
-  var btn = e.target;
-  var td = btn.closest('td');
-  if (!td) return;
-  var user = td.getAttribute('data-user');
-  if (!user) return;
+var clientsTable = document.getElementById('clientsTable');
+if (clientsTable) {
+  clientsTable.addEventListener('click', function(e) {
+    var btn = e.target;
+    var td = btn.closest('td');
+    if (!td) return;
+    var user = td.getAttribute('data-user');
+    if (!user) return;
 
-  if (btn.classList.contains('btn-ban')) {
-    banClient(btn);
-  } else if (btn.classList.contains('btn-unban')) {
-    unbanClient(btn);
-  } else if (btn.classList.contains('btn-delete')) {
-    deleteClient(btn);
-  } else if (btn.classList.contains('btn-redirect')) {
-    var url = td.querySelector('.inp-url').value;
-    sendRedirect(btn, url);
-  } else if (btn.classList.contains('btn-msg')) {
-    var msg = td.querySelector('.inp-msg').value;
-    sendMessage(btn, msg);
-  } else if (btn.classList.contains('btn-img')) {
-    var f = td.querySelector('.inp-img').files[0];
-    if (f) {
-      var fd = new FormData();
-      fd.append('username', user);
-      fd.append('image_file', f);
-      fetch('/clients/image', {method: 'POST', body: fd}).then(loadClients);
+    if (btn.classList.contains('btn-ban')) {
+      banClient(btn);
+    } else if (btn.classList.contains('btn-unban')) {
+      unbanClient(btn);
+    } else if (btn.classList.contains('btn-delete')) {
+      deleteClient(btn);
+    } else if (btn.classList.contains('btn-redirect')) {
+      var url = td.querySelector('.inp-url').value;
+      sendRedirect(btn, url);
+    } else if (btn.classList.contains('btn-msg')) {
+      var msg = td.querySelector('.inp-msg').value;
+      sendMessage(btn, msg);
+    } else if (btn.classList.contains('btn-img')) {
+      var f = td.querySelector('.inp-img').files[0];
+      if (f) {
+        var fd = new FormData();
+        fd.append('username', user);
+        fd.append('image_file', f);
+        fetch(ROUTES.clientImage, {method: 'POST', body: fd}).then(loadClients);
+      }
+    } else if (btn.classList.contains('btn-effect')) {
+      sendEffect(btn, td.querySelector('.inp-effect').value);
+    } else if (btn.classList.contains('btn-effect-clear')) {
+      sendEffect(btn, '');
     }
-  } else if (btn.classList.contains('btn-effect')) {
-    sendEffect(btn, td.querySelector('.inp-effect').value);
-  } else if (btn.classList.contains('btn-effect-clear')) {
-    sendEffect(btn, '');
-  }
-});
+  });
+}
 
 document.getElementById('filterSelect')?.addEventListener('change', function(e) {
   clientState.filter = e.target.value;
@@ -595,3 +652,176 @@ document.getElementById('sortSelect')?.addEventListener('change', function(e) {
   clientState.sortBy = e.target.value;
   loadClients();
 });
+
+    // --- Image Manager ---
+    const IMAGE_HISTORY_KEY = 'globalImageHistory';
+    let currentSelectedImage = null;
+
+    function loadImageHistory() {
+      const stored = localStorage.getItem(IMAGE_HISTORY_KEY);
+      try {
+        return stored ? JSON.parse(stored) : [];
+      } catch (err) {
+        console.error(err);
+        return [];
+      }
+    }
+
+    function saveImageToHistory(base64, name) {
+      let history = loadImageHistory();
+      if (!history.some(item => item.base64 === base64)) {
+        history.push({base64: base64, name: name});
+        localStorage.setItem(IMAGE_HISTORY_KEY, JSON.stringify(history));
+        addImageManagerEntry(base64, name);
+      }
+      selectImage(base64);
+    }
+
+    function convertImageToBase64(input, userId) {
+      const file = input.files[0];
+      if (!file) return;
+      let name = prompt("Enter a name for this image:", file.name) || file.name;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64 = e.target.result;
+        document.getElementById('image_' + userId).value = base64;
+        saveImageToHistory(base64, name);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function addImageManagerEntry(base64, name) {
+      const container = document.getElementById('image_manager_global');
+      if (!container) return;
+      if (Array.from(container.children).some(div => div.dataset.base64 === base64)) return;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.dataset.base64 = base64;
+      div.innerHTML = `
+        <button type="button" onclick="selectImage('${base64}')">Select</button>
+        <button type="button" onclick="previewImage('${base64}')">Preview</button>
+        <button type="button" onclick="deleteImage('${base64}', this)">Delete</button>
+        <span class="entry-name">${name}</span>
+      `;
+      container.appendChild(div);
+    }
+
+    function selectImage(base64) {
+      currentSelectedImage = base64;
+      document.querySelectorAll('input[name=image]').forEach(inp => inp.value = base64);
+      updateImageVisual();
+    }
+
+    function redirectAllActive() {
+      const url = prompt("Enter URL to redirect all active clients to:", "https://example.com");
+      if (!url) return;
+
+      fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
+        const promises = [];
+        for (const [user, data] of Object.entries(clients)) {
+          if (data.recent) {
+            promises.push(fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+          }
+        }
+        Promise.all(promises).then(loadClients);
+      });
+    }
+
+    function messageAllActive() {
+      const msg = prompt("Enter message to send to all active clients:");
+      if (!msg) return;
+
+      fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
+        const promises = [];
+        for (const [user, data] of Object.entries(clients)) {
+          if (data.recent) {
+            promises.push(fetch(ROUTES.clientMessage, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&message=' + encodeURIComponent(msg), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+          }
+        }
+        Promise.all(promises).then(loadClients);
+      });
+    }
+
+    function updateImageVisual() {
+      document.querySelectorAll('#image_manager_global .entry').forEach(div => {
+        if (div.dataset.base64 === currentSelectedImage) {
+          div.classList.add('selected');
+        } else {
+          div.classList.remove('selected');
+        }
+      });
+      const label = document.getElementById('current_selected_image');
+      if (!label) return;
+      if (currentSelectedImage) {
+        const item = loadImageHistory().find(i => i.base64 === currentSelectedImage);
+        label.textContent = "Current Selected Image: " + (item ? item.name : "");
+      } else {
+        label.textContent = "No Image Selected";
+      }
+    }
+
+    function previewImage(base64) {
+      const win = window.open();
+      if (!win) return;
+      win.document.write('<img src="' + base64 + '" style="max-width:100%;max-height:100%;">');
+    }
+
+    function deleteImage(base64, btn) {
+      let history = loadImageHistory();
+      history = history.filter(item => item.base64 !== base64);
+      localStorage.setItem(IMAGE_HISTORY_KEY, JSON.stringify(history));
+      if (btn && btn.parentElement) btn.parentElement.remove();
+      if (currentSelectedImage === base64) {
+        currentSelectedImage = null;
+        updateImageVisual();
+      }
+    }
+
+    function initGlobalImageHistory() {
+      const history = loadImageHistory();
+      history.forEach(item => addImageManagerEntry(item.base64, item.name));
+      updateImageVisual();
+    }
+
+    function rickrollAllClients() {
+      if (!confirm("Are you sure you want to Rickroll all active clients?")) return;
+
+      const rickUrl = "https://shattereddisk.github.io/rickroll/rickroll.mp4";
+      const passcode = prompt("Enter passcode:");
+      if (!passcode) {
+        alert("Passcode required!");
+        return;
+      }
+
+      const activeRows = document.querySelectorAll('tr.recent');
+
+      activeRows.forEach(row => {
+        const username = row.querySelector('input[name="username"]')?.value;
+        if (!username) return;
+
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = ROUTES.clientRedirect;
+        form.style.display = 'none';
+
+        const userInput = document.createElement('input');
+        userInput.name = 'username';
+        userInput.value = username;
+        form.appendChild(userInput);
+
+        const urlInput = document.createElement('input');
+        urlInput.name = 'url';
+        urlInput.value = rickUrl;
+        form.appendChild(urlInput);
+
+        const passInput = document.createElement('input');
+        passInput.name = 'passcode';
+        passInput.value = passcode;
+        form.appendChild(passInput);
+
+        document.body.appendChild(form);
+        form.submit();
+      });
+    }

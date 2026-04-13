@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Client Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+    .recent { background-color: #c8f7c5; }
+    .inactive { background-color: #f7c5c5; }
+    table { margin-bottom: 30px; border-collapse: collapse; width: 100%; }
+    th, td { padding: 8px 12px; border: 1px solid #999; text-align: left; vertical-align: top; }
+
+    /* Sound/Image Manager */
+    .manager { border: 2px solid #333; padding: 10px; max-width: 800px; margin-top:10px; background: #f0f0f0; }
+    .entry { margin: 5px 0; padding: 5px; display: flex; align-items: center; border: 1px solid #999; border-radius: 4px; background: #fff; cursor: pointer; }
+    .entry.selected { border-color: #007bff; background-color: #cce5ff; }
+    .entry button { margin-right: 5px; }
+    .entry-name { flex-grow: 1; font-weight: bold; }
+
+    .selected-label { font-weight: bold; color: #007bff; margin-top: 10px; display: block; }
+    img.client-img { max-width: 100px; max-height: 100px; display:block; margin-top:5px; border:1px solid #ccc; border-radius:4px; }
+  </style>
+</head>
+<body>
+<h1 id="page-title">Client Manager</h1>
+<button onclick="loadClients()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;">Refresh</button>
+<button id="btn-auto" onclick="toggleAutoRefresh()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;">Auto Refresh</button>
+
+<select id="filterSelect" style="margin-bottom:10px;padding:5px;">
+<option value="all">All</option>
+<option value="active">Active</option>
+<option value="banned">Banned</option>
+<option value="inactive">Inactive</option>
+</select>
+<select id="sortSelect" style="margin-bottom:10px;padding:5px;">
+<option value="recent">Sort by Recent</option>
+<option value="name">Sort by Name</option>
+<option value="url">Sort by URL</option>
+</select>
+<div id="clientStats" style="margin-bottom:10px;"></div>
+<button id="btn-ban-all" onclick="banAllActive()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:orange;color:white;">Ban All Active</button>
+<button id="btn-unban-all" onclick="unbanAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:green;color:white;">Unban All</button>
+<button id="btn-delete-all" onclick="deleteAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:red;color:white;">Delete All</button>
+<button id="btn-lockdown" onclick="if(this.textContent==='LOCKDOWN'){toggleLockdown()}else{disableLockdown()}" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:#ff00ff;color:white;font-weight:bold;">LOCKDOWN</button>
+<table id="clientsTable">
+<tr>
+  <th>Username</th>
+  <th>Status</th>
+  <th>Last Ping</th>
+  <th>Current URL</th>
+  <th>Actions</th>
+</tr>
+</table>
+
+<div class="manager" id="image_manager_global">
+<button class="entry" onclick="redirectAllActive()" style="margin-top:10px; background-color:#4CAF50; color:white; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;">
+  Redirect All Active Clients
+</button>
+<button class="entry" onclick="messageAllActive()" style="margin-top:10px; background-color:#2196F3; color:white; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;">
+  Message All Active Clients
+</button>
+</div>
+
+<p><a href="/">Back Home</a></p>
+<script src="/panel.js"></script>
+</body>
+</html>
