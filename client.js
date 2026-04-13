@@ -58,18 +58,12 @@
         [/\\bUnban\\b/gi, 'Débannir'],
         [/\\bSepia\\b/gi, 'Sépia'],
         [/\\bGrayscale\\b/gi, 'Niveaux de gris'],
-        [/\\bRainbow\\b/gi, 'Arc-en-ciel'],
-        [/\\bWobble\\b/gi, 'Tangage'],
         [/\\bComic Mode\\b/gi, 'Mode bande dessinée'],
         [/\\bZoom Pop\\b/gi, 'Zoom pop'],
         [/\\bBlur\\b/gi, 'Flou'],
-        [/\\bVertical Flip\\b/gi, 'Renversement vertical'],
         [/\\bNeon Glow\\b/gi, 'Lueur néon'],
         [/\\bScanlines\\b/gi, 'Lignes CRT'],
         [/\\bPulse\\b/gi, 'Pouls'],
-        [/\\bSkew\\b/gi, 'Inclinaison'],
-        [/\\bSpin\\b/gi, 'Rotation'],
-        [/\\bConfetti\\b/gi, 'Confettis'],
         [/\\bActive\\b/gi, 'Actif'],
         [/\\bInactive\\b/gi, 'Inactif'],
         [/\\bUnknown\\b/gi, 'Inconnu'],
@@ -154,15 +148,9 @@
 
         document.documentElement.classList.remove(
             'client-party',
-            'client-glitch',
-            'client-rainbow',
-            'client-wobble',
             'client-neon',
             'client-scanlines',
-            'client-pulse',
-            'client-skew',
-            'client-spin',
-            'client-confetti'
+            'client-pulse'
         );
         document.documentElement.style.filter = '';
         document.documentElement.style.transform = '';
@@ -203,19 +191,12 @@
         } else if (effect === 'mirror') {
             document.documentElement.style.transform = 'scaleX(-1)';
             document.documentElement.style.transformOrigin = 'center center';
-        } else if (effect === 'tiny') {
-            document.documentElement.style.transform = 'scale(0.88)';
-            document.documentElement.style.transformOrigin = 'top center';
-            document.documentElement.style.zoom = '0.9';
         } else if (effect === 'sepia') {
             document.documentElement.style.filter = 'sepia(1) saturate(1.25) contrast(1.05)';
         } else if (effect === 'gray') {
             document.documentElement.style.filter = 'grayscale(1) contrast(1.08)';
         } else if (effect === 'blur') {
             document.documentElement.style.filter = 'blur(1.5px) saturate(0.9)';
-        } else if (effect === 'flipv') {
-            document.documentElement.style.transform = 'scaleY(-1)';
-            document.documentElement.style.transformOrigin = 'center center';
         } else if (effect === 'party') {
             ensureStyle(`
                 @keyframes clientPartySpin {
@@ -227,45 +208,6 @@
                 }
             `);
             document.documentElement.classList.add('client-party');
-        } else if (effect === 'glitch') {
-            ensureStyle(`
-                @keyframes clientGlitchShake {
-                    0% { transform: translate(0, 0); }
-                    25% { transform: translate(1px, -1px); }
-                    50% { transform: translate(-1px, 1px); }
-                    75% { transform: translate(1px, 1px); }
-                    100% { transform: translate(0, 0); }
-                }
-                html.client-glitch body {
-                    animation: clientGlitchShake 0.18s infinite;
-                }
-            `);
-            document.documentElement.classList.add('client-glitch');
-        } else if (effect === 'rainbow') {
-            ensureStyle(`
-                @keyframes clientRainbowPulse {
-                    0% { filter: hue-rotate(0deg) saturate(1.3); }
-                    100% { filter: hue-rotate(360deg) saturate(1.7); }
-                }
-                html.client-rainbow body {
-                    animation: clientRainbowPulse 1.2s linear infinite;
-                }
-            `);
-            document.documentElement.classList.add('client-rainbow');
-        } else if (effect === 'wobble') {
-            ensureStyle(`
-                @keyframes clientWobble {
-                    0% { transform: rotate(0deg) translate(0, 0); }
-                    25% { transform: rotate(0.6deg) translate(1px, -1px); }
-                    50% { transform: rotate(-0.6deg) translate(-1px, 1px); }
-                    75% { transform: rotate(0.4deg) translate(1px, 1px); }
-                    100% { transform: rotate(0deg) translate(0, 0); }
-                }
-                html.client-wobble body {
-                    animation: clientWobble 0.7s ease-in-out infinite;
-                }
-            `);
-            document.documentElement.classList.add('client-wobble');
         } else if (effect === 'comic') {
             document.documentElement.style.filter = 'contrast(1.5) saturate(1.8) brightness(1.05)';
         } else if (effect === 'zoom') {
@@ -306,36 +248,6 @@
                 }
             `);
             document.documentElement.classList.add('client-pulse');
-        } else if (effect === 'skew') {
-            document.documentElement.style.transform = 'skewX(-5deg)';
-            document.documentElement.style.transformOrigin = 'center center';
-        } else if (effect === 'spin') {
-            ensureStyle(`
-                @keyframes clientSpin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                html.client-spin body {
-                    animation: clientSpin 8s linear infinite;
-                }
-            `);
-            document.documentElement.classList.add('client-spin');
-        } else if (effect === 'confetti') {
-            ensureStyle(`
-                @keyframes clientConfetti {
-                    0% { background-position: 0 0, 0 0, 0 0; }
-                    100% { background-position: 120px 80px, -90px 140px, 200px -100px; }
-                }
-                html.client-confetti body {
-                    background-image:
-                        radial-gradient(circle, rgba(255,0,0,0.35) 0 2px, transparent 3px),
-                        radial-gradient(circle, rgba(0,255,0,0.30) 0 2px, transparent 3px),
-                        radial-gradient(circle, rgba(0,128,255,0.30) 0 2px, transparent 3px);
-                    background-size: 80px 80px, 120px 120px, 160px 160px;
-                    animation: clientConfetti 10s linear infinite;
-                }
-            `);
-            document.documentElement.classList.add('client-confetti');
         } else if (effect === 'french') {
             applyFrenchMode();
             frenchObserver = new MutationObserver(function() {

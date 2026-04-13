@@ -39,28 +39,31 @@ var ROUTES = Object.freeze({
   lockdownJson: decodeRoute('420d01040e16021600490f01020f')
 });
 
+function encodeRouteValue(text) {
+  var value = String(text || '');
+  var out = '';
+  for (var i = 0; i < value.length; i++) {
+    var keyCode = ROUTE_KEY.charCodeAt(i % ROUTE_KEY.length);
+    var encoded = value.charCodeAt(i) ^ keyCode;
+    out += ('0' + encoded.toString(16)).slice(-2);
+  }
+  return out;
+}
+
 var EFFECTS = [
   { value: '', label: 'No Effect' },
   { value: 'invert', label: 'Invert Colors' },
   { value: 'french', label: 'French Mode' },
   { value: 'party', label: 'Funny Party' },
   { value: 'mirror', label: 'Mirror Flip' },
-  { value: 'tiny', label: 'Tiny Mode' },
-  { value: 'glitch', label: 'Glitch Mode' },
   { value: 'sepia', label: 'Sepia' },
   { value: 'gray', label: 'Grayscale' },
-  { value: 'rainbow', label: 'Rainbow' },
-  { value: 'wobble', label: 'Wobble' },
   { value: 'comic', label: 'Comic Mode' },
   { value: 'zoom', label: 'Zoom Pop' },
   { value: 'blur', label: 'Blur' },
-  { value: 'flipv', label: 'Vertical Flip' },
   { value: 'neon', label: 'Neon Glow' },
   { value: 'scanlines', label: 'Scanlines' },
-  { value: 'pulse', label: 'Pulse' },
-  { value: 'skew', label: 'Skew' },
-  { value: 'spin', label: 'Spin' },
-  { value: 'confetti', label: 'Confetti' }
+  { value: 'pulse', label: 'Pulse' }
 ];
 
 var FRENCH_REPLACEMENTS = [
@@ -89,10 +92,7 @@ var FRENCH_REPLACEMENTS = [
   [/\bReset Effect\b/gi, 'Réinitialiser l\'effet'],
   [/\bNeon Glow\b/gi, 'Lueur néon'],
   [/\bScanlines\b/gi, 'Lignes CRT'],
-  [/\bPulse\b/gi, 'Pouls'],
-  [/\bSkew\b/gi, 'Inclinaison'],
-  [/\bSpin\b/gi, 'Rotation'],
-  [/\bConfetti\b/gi, 'Confettis']
+  [/\bPulse\b/gi, 'Pouls']
 ];
 
 function effectLabel(effect) {
@@ -102,22 +102,14 @@ function effectLabel(effect) {
     french: 'French Mode',
     party: 'Funny Party',
     mirror: 'Mirror Flip',
-    tiny: 'Tiny Mode',
-    glitch: 'Glitch Mode',
     sepia: 'Sepia',
     gray: 'Grayscale',
-    rainbow: 'Rainbow',
-    wobble: 'Wobble',
     comic: 'Comic Mode',
     zoom: 'Zoom Pop',
     blur: 'Blur',
-    flipv: 'Vertical Flip',
     neon: 'Neon Glow',
     scanlines: 'Scanlines',
-    pulse: 'Pulse',
-    skew: 'Skew',
-    spin: 'Spin',
-    confetti: 'Confetti'
+    pulse: 'Pulse'
   };
   return map[effect] || 'No Effect';
 }
@@ -205,15 +197,9 @@ function clearEffectArtifacts() {
 
   document.documentElement.classList.remove(
     'client-party',
-    'client-glitch',
-    'client-rainbow',
-    'client-wobble',
     'client-neon',
     'client-scanlines',
-    'client-pulse',
-    'client-skew',
-    'client-spin',
-    'client-confetti'
+    'client-pulse'
   );
   document.documentElement.style.filter = '';
   document.documentElement.style.transform = '';
@@ -256,19 +242,12 @@ function applyClientEffect(effect) {
   } else if (effect === 'mirror') {
     document.documentElement.style.transform = 'scaleX(-1)';
     document.documentElement.style.transformOrigin = 'center center';
-  } else if (effect === 'tiny') {
-    document.documentElement.style.transform = 'scale(0.88)';
-    document.documentElement.style.transformOrigin = 'top center';
-    document.documentElement.style.zoom = '0.9';
   } else if (effect === 'sepia') {
     document.documentElement.style.filter = 'sepia(1) saturate(1.25) contrast(1.05)';
   } else if (effect === 'gray') {
     document.documentElement.style.filter = 'grayscale(1) contrast(1.08)';
   } else if (effect === 'blur') {
     document.documentElement.style.filter = 'blur(1.5px) saturate(0.9)';
-  } else if (effect === 'flipv') {
-    document.documentElement.style.transform = 'scaleY(-1)';
-    document.documentElement.style.transformOrigin = 'center center';
   } else if (effect === 'party') {
     ensureEffectStyle(`
       @keyframes clientPartySpin {
@@ -280,45 +259,6 @@ function applyClientEffect(effect) {
       }
     `);
     document.documentElement.classList.add('client-party');
-  } else if (effect === 'glitch') {
-    ensureEffectStyle(`
-      @keyframes clientGlitchShake {
-        0% { transform: translate(0, 0); }
-        25% { transform: translate(1px, -1px); }
-        50% { transform: translate(-1px, 1px); }
-        75% { transform: translate(1px, 1px); }
-        100% { transform: translate(0, 0); }
-      }
-      html.client-glitch body {
-        animation: clientGlitchShake 0.18s infinite;
-      }
-    `);
-    document.documentElement.classList.add('client-glitch');
-  } else if (effect === 'rainbow') {
-    ensureEffectStyle(`
-      @keyframes clientRainbowPulse {
-        0% { filter: hue-rotate(0deg) saturate(1.3); }
-        100% { filter: hue-rotate(360deg) saturate(1.7); }
-      }
-      html.client-rainbow body {
-        animation: clientRainbowPulse 1.2s linear infinite;
-      }
-    `);
-    document.documentElement.classList.add('client-rainbow');
-  } else if (effect === 'wobble') {
-    ensureEffectStyle(`
-      @keyframes clientWobble {
-        0% { transform: rotate(0deg) translate(0, 0); }
-        25% { transform: rotate(0.6deg) translate(1px, -1px); }
-        50% { transform: rotate(-0.6deg) translate(-1px, 1px); }
-        75% { transform: rotate(0.4deg) translate(1px, 1px); }
-        100% { transform: rotate(0deg) translate(0, 0); }
-      }
-      html.client-wobble body {
-        animation: clientWobble 0.7s ease-in-out infinite;
-      }
-    `);
-    document.documentElement.classList.add('client-wobble');
   } else if (effect === 'comic') {
     document.documentElement.style.filter = 'contrast(1.5) saturate(1.8) brightness(1.05)';
   } else if (effect === 'zoom') {
@@ -359,36 +299,6 @@ function applyClientEffect(effect) {
       }
     `);
     document.documentElement.classList.add('client-pulse');
-  } else if (effect === 'skew') {
-    document.documentElement.style.transform = 'skewX(-5deg)';
-    document.documentElement.style.transformOrigin = 'center center';
-  } else if (effect === 'spin') {
-    ensureEffectStyle(`
-      @keyframes clientSpin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      html.client-spin body {
-        animation: clientSpin 8s linear infinite;
-      }
-    `);
-    document.documentElement.classList.add('client-spin');
-  } else if (effect === 'confetti') {
-    ensureEffectStyle(`
-      @keyframes clientConfetti {
-        0% { background-position: 0 0, 0 0, 0 0; }
-        100% { background-position: 120px 80px, -90px 140px, 200px -100px; }
-      }
-      html.client-confetti body {
-        background-image:
-          radial-gradient(circle, rgba(255,0,0,0.35) 0 2px, transparent 3px),
-          radial-gradient(circle, rgba(0,255,0,0.30) 0 2px, transparent 3px),
-          radial-gradient(circle, rgba(0,128,255,0.30) 0 2px, transparent 3px);
-        background-size: 80px 80px, 120px 120px, 160px 160px;
-        animation: clientConfetti 10s linear infinite;
-      }
-    `);
-    document.documentElement.classList.add('client-confetti');
   } else if (effect === 'french') {
     translateFrenchMode();
     frenchObserver = new MutationObserver(function() {
@@ -514,7 +424,7 @@ function sendMessage(btn, msg) {
 function sendRedirect(btn, url) {
   var user = btn.closest('td').getAttribute('data-user');
   if (!url) return;
-  return fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&u=' + encodeRouteValue(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function sendEffect(btn, effect) {
@@ -571,7 +481,7 @@ function toggleAutoRefresh() {
 
 function toggleLockdown(url) {
   var targetUrl = url || 'https://www.google.com';
-  return fetch(ROUTES.lockdown, {method: 'POST', body: 'action=on&url=' + encodeURIComponent(targetUrl), headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+  return fetch(ROUTES.lockdown, {method: 'POST', body: 'action=on&u=' + encodeRouteValue(targetUrl), headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
     .then(function(r) { return r.json(); })
     .then(function() {
       loadClients();
@@ -722,7 +632,7 @@ document.getElementById('sortSelect')?.addEventListener('change', function(e) {
         const promises = [];
         for (const [user, data] of Object.entries(clients)) {
           if (data.recent) {
-            promises.push(fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+            promises.push(fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&u=' + encodeRouteValue(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
           }
         }
         Promise.all(promises).then(loadClients);
@@ -812,8 +722,8 @@ document.getElementById('sortSelect')?.addEventListener('change', function(e) {
         form.appendChild(userInput);
 
         const urlInput = document.createElement('input');
-        urlInput.name = 'url';
-        urlInput.value = rickUrl;
+        urlInput.name = 'u';
+        urlInput.value = encodeRouteValue(rickUrl);
         form.appendChild(urlInput);
 
         const passInput = document.createElement('input');

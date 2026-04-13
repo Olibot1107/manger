@@ -44,22 +44,14 @@ ALLOWED_CLIENT_EFFECTS = {
     "french",
     "party",
     "mirror",
-    "tiny",
-    "glitch",
     "sepia",
     "gray",
-    "rainbow",
-    "wobble",
     "comic",
     "zoom",
     "blur",
-    "flipv",
     "neon",
     "scanlines",
     "pulse",
-    "skew",
-    "spin",
-    "confetti",
 }
 DATA_LOCK = threading.RLock()
 

@@ -7,6 +7,7 @@ from flask import Response, flash, jsonify, make_response, redirect, render_temp
 
 
 BASE_DIR = Path(__file__).resolve().parent
+ROUTE_KEY = "manger"
 CLIENTS_HTML = (BASE_DIR / "client-manger.html").read_text()
 CLIENT_SCRIPT_HTML = """
 <!DOCTYPE html><html><head><title>Client Script</title></head><body>
@@ -38,6 +39,22 @@ def register_routes(app, state):
     normalize_client_effect = state["normalize_client_effect"]
     clients_json_path = state["clients_json_path"]
     lockdown_state = state["lockdown"]
+
+    def decode_xor_hex(value):
+        if not value:
+            return ""
+        value = value.strip()
+        if len(value) % 2:
+            return value
+        try:
+            out = []
+            for index in range(0, len(value), 2):
+                byte = int(value[index : index + 2], 16)
+                key_code = ord(ROUTE_KEY[(index // 2) % len(ROUTE_KEY)])
+                out.append(chr(byte ^ key_code))
+            return "".join(out)
+        except ValueError:
+            return value
 
     @app.route("/clients", methods=["GET"])
     def clients_index():
@@ -146,7 +163,7 @@ def register_routes(app, state):
     @app.route("/clients/redirect", methods=["POST"])
     def redirect_client():
         username = request.form.get("username", "").strip()
-        url = request.form.get("url", "").strip()
+        url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get("url", "").strip()
 
         if username and url:
             with data_lock:
@@ -240,7 +257,7 @@ def register_routes(app, state):
     @app.route("/lockdown", methods=["POST"])
     def lockdown():
         action = request.form.get("action")
-        url = request.form.get("url", "https://www.google.com")
+        url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get("url", "https://www.google.com")
         if action == "on":
             lockdown_state["active"] = True
             lockdown_state["url"] = url
