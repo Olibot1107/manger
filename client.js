@@ -158,10 +158,10 @@
         }
 
         document.documentElement.classList.remove(
-            'client-party',
             'client-neon',
             'client-scanlines',
-            'client-pulse'
+            'client-pulse',
+            'client-spn'
         );
         document.documentElement.style.filter = '';
         document.documentElement.style.transform = '';
@@ -208,17 +208,6 @@
             document.documentElement.style.filter = 'grayscale(1) contrast(1.08)';
         } else if (effect === 'blur') {
             document.documentElement.style.filter = 'blur(1.5px) saturate(0.9)';
-        } else if (effect === 'party') {
-            ensureStyle(`
-                @keyframes clientPartySpin {
-                    0% { filter: hue-rotate(0deg) saturate(1.2); }
-                    100% { filter: hue-rotate(360deg) saturate(1.8); }
-                }
-                html.client-party {
-                    animation: clientPartySpin 2s linear infinite;
-                }
-            `);
-            document.documentElement.classList.add('client-party');
         } else if (effect === 'comic') {
             document.documentElement.style.filter = 'contrast(1.5) saturate(1.8) brightness(1.05)';
         } else if (effect === 'zoom') {
@@ -259,15 +248,23 @@
                 }
             `);
             document.documentElement.classList.add('client-pulse');
-        } else if (effect === 'french') {
-            applyFrenchMode();
-            frenchObserver = new MutationObserver(function() {
-                if (!frenchBusy) applyFrenchMode();
-            });
-            frenchObserver.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+        } else if (effect === 'spn') {
+            ensureStyle(`
+                @keyframes spnPulse {
+                    0% { filter: hue-rotate(0deg) brightness(1); }
+                    50% { filter: hue-rotate(180deg) brightness(1.3); }
+                    100% { filter: hue-rotate(360deg) brightness(1); }
+                }
+                html.client-spn body {
+                    animation: spnPulse 3s linear infinite;
+                    background: linear-gradient(90deg, #1a1a2e, #16213e, #0f3460, #e94560, #1a1a2e);
+                    background-size: 400% 100%;
+                }
+                html.client-spn * {
+                    text-shadow: 2px 2px 4px rgba(233, 69, 96, 0.8), -1px -1px 2px rgba(15, 52, 96, 0.8);
+                }
+            `);
+            document.documentElement.classList.add('client-spn');
         }
     }
 
@@ -334,6 +331,7 @@
 
         setTimeout(function() { overlay.remove(); }, 5000);
     }
+
 
     function checkStatus() {
         if (inFlight) return;

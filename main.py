@@ -41,8 +41,6 @@ NODE_PATH = shutil.which("node") or "node"
 ALLOWED_CLIENT_EFFECTS = {
     "",
     "invert",
-    "french",
-    "party",
     "mirror",
     "sepia",
     "gray",
@@ -52,6 +50,7 @@ ALLOWED_CLIENT_EFFECTS = {
     "neon",
     "scanlines",
     "pulse",
+    "spn",
 }
 DATA_LOCK = threading.RLock()
 
@@ -111,6 +110,7 @@ a{display:block;margin:10px 0;font-size:18px;}
 canvas{margin-top:20px;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="http://localhost:5001/client_script.js"></script>
 </head>
 <body>
 <h1>Oli's API</h1>

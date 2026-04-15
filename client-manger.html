@@ -40,7 +40,8 @@
 <button id="btn-ban-all" onclick="banAllActive()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:orange;color:white;">Ban All Active</button>
 <button id="btn-unban-all" onclick="unbanAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:green;color:white;">Unban All</button>
 <button id="btn-delete-all" onclick="deleteAll()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:red;color:white;">Delete All</button>
-<button id="btn-lockdown" onclick="if(this.textContent==='LOCKDOWN'){toggleLockdown()}else{disableLockdown()}" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:#ff00ff;color:white;font-weight:bold;">LOCKDOWN</button>
+<button id="btn-lockdown" onclick="if(this.textContent==='LOCKDOWN'){promptLockdown()}else{disableLockdown()}" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:#ff00ff;color:white;font-weight:bold;">LOCKDOWN</button>
+<button onclick="showIdAllClients()" style="margin-bottom:10px;padding:5px 10px;cursor:pointer;background-color:#9C27B0;color:white;">Show My ID (All)</button>
 <table id="clientsTable">
 <tr>
   <th>Username</th>
@@ -58,6 +59,13 @@
 <button class="entry" onclick="messageAllActive()" style="margin-top:10px; background-color:#2196F3; color:white; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;">
   Message All Active Clients
 </button>
+<button class="entry" onclick="showIdAllClients()" style="margin-top:10px; background-color:#9C27B0; color:white; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;">
+  Show My ID (All Clients)
+</button>
+<button class="entry" onclick="document.getElementById('sendImageAllInput').click()" style="margin-top:10px; background-color:#E91E63; color:white; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;">
+  Send Image To All Active
+</button>
+<input type="file" id="sendImageAllInput" accept="image/*" style="display:none" onchange="sendImageFileToAllActive(this)">
 </div>
 
 <p><a href="/">Back Home</a></p>

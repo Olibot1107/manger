@@ -54,8 +54,6 @@ function encodeRouteValue(text) {
 var EFFECTS = [
   { value: '', label: 'No Effect' },
   { value: 'invert', label: 'Invert Colors' },
-  { value: 'french', label: 'French Mode' },
-  { value: 'party', label: 'Funny Party' },
   { value: 'mirror', label: 'Mirror Flip' },
   { value: 'sepia', label: 'Sepia' },
   { value: 'gray', label: 'Grayscale' },
@@ -64,7 +62,8 @@ var EFFECTS = [
   { value: 'blur', label: 'Blur' },
   { value: 'neon', label: 'Neon Glow' },
   { value: 'scanlines', label: 'Scanlines' },
-  { value: 'pulse', label: 'Pulse' }
+  { value: 'pulse', label: 'Pulse' },
+  { value: 'spn', label: 'SPN Screen' }
 ];
 
 var FRENCH_REPLACEMENTS = [
@@ -100,8 +99,6 @@ function effectLabel(effect) {
   var map = {
     '': 'No Effect',
     invert: 'Invert Colors',
-    french: 'French Mode',
-    party: 'Funny Party',
     mirror: 'Mirror Flip',
     sepia: 'Sepia',
     gray: 'Grayscale',
@@ -110,7 +107,8 @@ function effectLabel(effect) {
     blur: 'Blur',
     neon: 'Neon Glow',
     scanlines: 'Scanlines',
-    pulse: 'Pulse'
+    pulse: 'Pulse',
+    spn: 'SPN Screen'
   };
   return map[effect] || 'No Effect';
 }
@@ -197,10 +195,10 @@ function clearEffectArtifacts() {
   }
 
   document.documentElement.classList.remove(
-    'client-party',
     'client-neon',
     'client-scanlines',
-    'client-pulse'
+    'client-pulse',
+    'client-spn'
   );
   document.documentElement.style.filter = '';
   document.documentElement.style.transform = '';
@@ -300,16 +298,23 @@ function applyClientEffect(effect) {
       }
     `);
     document.documentElement.classList.add('client-pulse');
-  } else if (effect === 'french') {
-    translateFrenchMode();
-    frenchObserver = new MutationObserver(function() {
-      translateFrenchMode();
-    });
-    frenchObserver.observe(document.body, {
-      childList: true,
-      characterData: true,
-      subtree: true
-    });
+  } else if (effect === 'spn') {
+    ensureEffectStyle(`
+      @keyframes spnPulse {
+        0% { filter: hue-rotate(0deg) brightness(1); }
+        50% { filter: hue-rotate(180deg) brightness(1.3); }
+        100% { filter: hue-rotate(360deg) brightness(1); }
+      }
+      html.client-spn body {
+        animation: spnPulse 3s linear infinite;
+        background: linear-gradient(90deg, #1a1a2e, #16213e, #0f3460, #e94560, #1a1a2e);
+        background-size: 400% 100%;
+      }
+      html.client-spn * {
+        text-shadow: 2px 2px 4px rgba(233, 69, 96, 0.8), -1px -1px 2px rgba(15, 52, 96, 0.8);
+      }
+    `);
+    document.documentElement.classList.add('client-spn');
   }
 }
 
@@ -349,7 +354,14 @@ function renderClients(clients) {
   filtered.forEach(([user, data]) => {
     const row = document.createElement('tr');
     row.className = data.recent ? 'recent' : 'inactive';
-    if (data.banned) row.style.backgroundColor = '#ffcccc';
+    let statusText = '';
+    
+    if (data.banned) {
+      row.style.backgroundColor = '#ffcccc';
+      statusText = '<span style="color:red;font-weight:bold;">BANNED</span>';
+    } else {
+      statusText = (data.recent ? '<span style="color:green;">Active</span>' : 'Inactive');
+    }
 
     const existing = existingRows[user];
     const effectValue = existing ? (existing.querySelector('.inp-effect')?.value || data.effect || '') : (data.effect || '');
@@ -360,7 +372,7 @@ function renderClients(clients) {
     row.setAttribute('data-user', user);
     row.innerHTML =
       '<td>' + escapeHtml(user) + '</td>' +
-      '<td>' + (data.banned ? '<span style="color:red;font-weight:bold;">BANNED</span>' : (data.recent ? '<span style="color:green;">Active</span>' : 'Inactive')) + '</td>' +
+      '<td>' + statusText + '</td>' +
       '<td>' + escapeHtml(data.last_ping || 'Never') + '</td>' +
       '<td>' + (data.current_url ? '<a href="' + escapeHtml(data.current_url) + '" target="_blank">' + escapeHtml(data.current_url) + '</a>' : '<span style="color:gray;">Unknown</span>') + '</td>' +
       '<td>' + escapeHtml(effectLabel(data.effect || '')) + '</td>' +
@@ -487,9 +499,13 @@ function toggleAutoRefresh() {
   }
 }
 
-function toggleLockdown(url) {
+function toggleLockdown(url, duration) {
   var targetUrl = url || 'https://www.google.com';
-  return fetch(ROUTES.lockdown, {method: 'POST', body: 'action=on&u=' + encodeRouteValue(targetUrl), headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+  var body = 'action=on&u=' + encodeRouteValue(targetUrl);
+  if (duration) {
+    body += '&duration=' + encodeURIComponent(duration);
+  }
+  return fetch(ROUTES.lockdown, {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
     .then(function(r) { return r.json(); })
     .then(function() {
       loadClients();
@@ -506,13 +522,27 @@ function disableLockdown() {
     });
 }
 
+function promptLockdown() {
+  var duration = prompt("Enter lockdown duration in minutes (leave empty for indefinite):", "7");
+  if (duration === null) return;
+  var url = prompt("Enter URL to redirect locked clients to:", "https://www.google.com");
+  if (url === null) return;
+  toggleLockdown(url, duration || '');
+}
+
 function updateLockdownBtn() {
   return fetch(ROUTES.lockdownJson).then(function(r) { return r.json(); }).then(function(d) {
     lockdownState.active = !!d.active;
+    lockdownState.unlockTime = d.unlock_time || null;
     var btn = document.getElementById('btn-lockdown');
     if (!btn) return;
     if (d.active) {
-      btn.textContent = 'UNLOCK';
+      if (d.unlock_time) {
+        var remaining = Math.max(0, Math.round((d.unlock_time - Date.now()) / 1000 / 60));
+        btn.textContent = 'LOCKED (' + remaining + 'm)';
+      } else {
+        btn.textContent = 'UNLOCK';
+      }
       btn.style.backgroundColor = 'green';
     } else {
       btn.textContent = 'LOCKDOWN';
@@ -523,6 +553,7 @@ function updateLockdownBtn() {
 
 loadClients().catch(function() {});
 updateLockdownBtn();
+setInterval(updateLockdownBtn, 30000);
 
 var clientsTable = document.getElementById('clientsTable');
 if (clientsTable) {
@@ -663,6 +694,61 @@ document.getElementById('sortSelect')?.addEventListener('change', function(e) {
         Promise.all(promises).then(loadClients);
       });
     }
+
+    function showIdAllClients() {
+      if (!confirm("Show each client's ID on their screen for 5 seconds?")) return;
+
+      fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
+        const promises = [];
+        for (const [user, data] of Object.entries(clients)) {
+          if (data.recent) {
+            promises.push(fetch(ROUTES.clientMessage, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&message=' + encodeURIComponent('Your ID: ' + user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+          }
+        }
+        Promise.all(promises).then(loadClients);
+      });
+    }
+
+
+    function sendImageToAllActive() {
+      if (!currentSelectedImage) {
+        alert("Please select an image first from the Image Manager below.");
+        return;
+      }
+      if (!confirm("Send selected image to all active clients?")) return;
+
+      fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
+        const promises = [];
+        for (const [user, data] of Object.entries(clients)) {
+          if (data.recent) {
+            promises.push(fetch(ROUTES.clientImage, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&image=' + encodeURIComponent(currentSelectedImage), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+          }
+        }
+        Promise.all(promises).then(loadClients);
+      });
+    }
+
+    function sendImageFileToAllActive(input) {
+      const f = input.files[0];
+      if (!f) return;
+      if (!confirm("Send this image to all active clients?")) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64 = e.target.result;
+        fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
+          const promises = [];
+          for (const [user, data] of Object.entries(clients)) {
+            if (data.recent) {
+              promises.push(fetch(ROUTES.clientImage, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&image=' + encodeURIComponent(base64), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+            }
+          }
+          Promise.all(promises).then(loadClients);
+        });
+      };
+      reader.readAsDataURL(f);
+    }
+
 
     function updateImageVisual() {
       document.querySelectorAll('#image_manager_global .entry').forEach(div => {
