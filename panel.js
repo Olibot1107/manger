@@ -16,6 +16,7 @@ var requestSeq = 0;
 var refreshTimer = null;
 
 var ROUTE_KEY = 'manger';
+
 function decodeRoute(hex) {
   var out = '';
   for (var i = 0; i < hex.length; i += 2) {
@@ -25,23 +26,6 @@ function decodeRoute(hex) {
   }
   return out;
 }
-
-var ROUTES = Object.freeze({
-  clientsJson: decodeRoute('4202020e001c1912400d161d03'),
-  clientBan: decodeRoute('4202020e001c19124105041c'),
-  clientUnban: decodeRoute('4202020e001c191241120b100c0f'),
-  clientDelete: decodeRoute('4202020e001c19124103001e08150b'),
-  clientMessage: decodeRoute('4202020e001c1912410a00011e000902'),
-  clientQuestion: decodeRoute('4202020e001c1912411610171e1507080b'),
-  clientTimeout: decodeRoute('4202020e001c191241130c1f080e1b13'),
-  clientTimeoutClear: '/clients/timeout/clear',
-  clientRedirect: decodeRoute('4202020e001c19124115001604130b0411'),
-  clientEffect: decodeRoute('4202020e001c19124102031408021a'),
-  clientNote: decodeRoute('4202020e001c191241090a0608'),
-  clientImage: decodeRoute('4202020e001c1912410e08130a04'),
-  lockdown: decodeRoute('420d01040e16021600'),
-  lockdownJson: decodeRoute('420d01040e16021600490f01020f')
-});
 
 function encodeRouteValue(text) {
   var value = String(text || '');
@@ -54,362 +38,23 @@ function encodeRouteValue(text) {
   return out;
 }
 
-var EFFECTS = [
-  { value: '', label: 'No Effect' },
-  { value: 'invert', label: 'Invert Colors' },
-  { value: 'mirror', label: 'Mirror Flip' },
-  { value: 'sepia', label: 'Sepia' },
-  { value: 'gray', label: 'Grayscale' },
-  { value: 'comic', label: 'Comic Mode' },
-  { value: 'zoom', label: 'Zoom Pop' },
-  { value: 'blur', label: 'Blur' },
-  { value: 'neon', label: 'Neon Glow' },
-  { value: 'scanlines', label: 'Scanlines' },
-  { value: 'pulse', label: 'Pulse' },
-  { value: 'spn', label: 'SPN Screen' }
-];
-
-var FRENCH_REPLACEMENTS = [
-  [/\bClient Manager\b/gi, 'Gestionnaire de clients'],
-  [/\bUsername\b/gi, "Nom d'utilisateur"],
-  [/\bStatus\b/gi, 'Statut'],
-  [/\bLast Ping\b/gi, 'Dernier ping'],
-  [/\bCurrent URL\b/gi, 'URL actuelle'],
-  [/\bActions\b/gi, 'Actions'],
-  [/\bAuto Refresh\b/gi, 'Rafraîchissement auto'],
-  [/\bRefresh\b/gi, 'Rafraîchir'],
-  [/\bBan All Active\b/gi, 'Bannir tous les actifs'],
-  [/\bAsk All Active\b/gi, 'Questionner tous les actifs'],
-  [/\bUnban All\b/gi, 'Débannir tout'],
-  [/\bDelete All\b/gi, 'Tout supprimer'],
-  [/\bActive\b/gi, 'Actif'],
-  [/\bInactive\b/gi, 'Inactif'],
-  [/\bBANNED\b/gi, 'INTERDIT'],
-  [/\bUnknown\b/gi, 'Inconnu'],
-  [/\bNever\b/gi, 'Jamais'],
-  [/\bRedirect\b/gi, 'Rediriger'],
-  [/\bMessage\b/gi, 'Message'],
-  [/\bQuestion\b/gi, 'Question'],
-  [/\bResponse\b/gi, 'Réponse'],
-  [/\bTimeout\b/gi, 'Timeout'],
-  [/\bImage\b/gi, 'Image'],
-  [/\bBan\b/gi, 'Bannir'],
-  [/\bUnban\b/gi, 'Débannir'],
-  [/\bApply Effect\b/gi, 'Appliquer l\'effet'],
-  [/\bReset Effect\b/gi, 'Réinitialiser l\'effet'],
-  [/\bNeon Glow\b/gi, 'Lueur néon'],
-  [/\bScanlines\b/gi, 'Lignes CRT'],
-  [/\bPulse\b/gi, 'Pouls']
-];
-
-function effectLabel(effect) {
-  var map = {
-    '': 'No Effect',
-    invert: 'Invert Colors',
-    mirror: 'Mirror Flip',
-    sepia: 'Sepia',
-    gray: 'Grayscale',
-    comic: 'Comic Mode',
-    zoom: 'Zoom Pop',
-    blur: 'Blur',
-    neon: 'Neon Glow',
-    scanlines: 'Scanlines',
-    pulse: 'Pulse',
-    spn: 'SPN Screen'
-  };
-  return map[effect] || 'No Effect';
-}
-
-function effectOptionsHtml(selected) {
-  return EFFECTS.map(function(effect) {
-    return '<option value="' + effect.value + '"' + (effect.value === selected ? ' selected' : '') + '>' + effect.label + '</option>';
-  }).join('');
-}
-
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function translateFrench(text) {
-  var result = String(text || '');
-  FRENCH_REPLACEMENTS.forEach(function(pair) {
-    result = result.replace(pair[0], pair[1]);
-  });
-  return result;
-}
-
-function walkTextNodes(root, callback) {
-  if (!root) return;
-  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-  var node;
-  while ((node = walker.nextNode())) {
-    if (!node.parentElement) continue;
-    var tag = node.parentElement.tagName;
-    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') continue;
-    callback(node);
-  }
-}
-
-function restoreFrenchMode() {
-  walkTextNodes(document.body, function(node) {
-    if (frenchTextMap.has(node)) {
-      node.nodeValue = frenchTextMap.get(node);
-    }
-  });
-
-  document.querySelectorAll('[placeholder]').forEach(function(el) {
-    if (frenchPlaceholderMap.has(el)) {
-      el.setAttribute('placeholder', frenchPlaceholderMap.get(el));
-    }
-  });
-
-  document.documentElement.removeAttribute('lang');
-}
-
-function translateFrenchMode() {
-  document.documentElement.setAttribute('lang', 'fr');
-
-  walkTextNodes(document.body, function(node) {
-    if (!frenchTextMap.has(node)) {
-      frenchTextMap.set(node, node.nodeValue);
-    }
-    node.nodeValue = translateFrench(frenchTextMap.get(node));
-  });
-
-  document.querySelectorAll('[placeholder]').forEach(function(el) {
-    if (!frenchPlaceholderMap.has(el)) {
-      frenchPlaceholderMap.set(el, el.getAttribute('placeholder') || '');
-    }
-    el.setAttribute('placeholder', translateFrench(frenchPlaceholderMap.get(el)));
-  });
-
-  document.title = translateFrench(document.title);
-}
-
-function clearEffectArtifacts() {
-  if (effectStyleNode) {
-    effectStyleNode.remove();
-    effectStyleNode = null;
-  }
-  if (frenchObserver) {
-    frenchObserver.disconnect();
-    frenchObserver = null;
-  }
-
-  document.documentElement.classList.remove(
-    'client-neon',
-    'client-scanlines',
-    'client-pulse',
-    'client-spn'
-  );
-  document.documentElement.style.filter = '';
-  document.documentElement.style.transform = '';
-  document.documentElement.style.transformOrigin = '';
-  document.documentElement.style.animation = '';
-  document.documentElement.style.zoom = '';
-
-  document.body.style.filter = '';
-  document.body.style.transform = '';
-  document.body.style.transformOrigin = '';
-  document.body.style.animation = '';
-  document.body.style.zoom = '';
-
-  restoreFrenchMode();
-}
-
-function ensureEffectStyle(css) {
-  if (effectStyleNode) {
-    effectStyleNode.remove();
-  }
-  effectStyleNode = document.createElement('style');
-  effectStyleNode.textContent = css;
-  document.head.appendChild(effectStyleNode);
-}
-
-function applyClientEffect(effect) {
-  effect = effect || '';
-  if (effect === currentEffect) {
-    if (effect === 'french') translateFrenchMode();
-    return;
-  }
-
-  clearEffectArtifacts();
-  currentEffect = effect;
-
-  if (!effect) return;
-
-  if (effect === 'invert') {
-    document.documentElement.style.filter = 'invert(1) hue-rotate(180deg)';
-  } else if (effect === 'mirror') {
-    document.documentElement.style.transform = 'scaleX(-1)';
-    document.documentElement.style.transformOrigin = 'center center';
-  } else if (effect === 'sepia') {
-    document.documentElement.style.filter = 'sepia(1) saturate(1.25) contrast(1.05)';
-  } else if (effect === 'gray') {
-    document.documentElement.style.filter = 'grayscale(1) contrast(1.08)';
-  } else if (effect === 'blur') {
-    document.documentElement.style.filter = 'blur(1.5px) saturate(0.9)';
-  } else if (effect === 'party') {
-    ensureEffectStyle(`
-      @keyframes clientPartySpin {
-        0% { filter: hue-rotate(0deg) saturate(1.2); }
-        100% { filter: hue-rotate(360deg) saturate(1.8); }
-      }
-      html.client-party {
-        animation: clientPartySpin 2s linear infinite;
-      }
-    `);
-    document.documentElement.classList.add('client-party');
-  } else if (effect === 'comic') {
-    document.documentElement.style.filter = 'contrast(1.5) saturate(1.8) brightness(1.05)';
-  } else if (effect === 'zoom') {
-    document.documentElement.style.transform = 'scale(1.08)';
-    document.documentElement.style.transformOrigin = 'top center';
-  } else if (effect === 'neon') {
-    ensureEffectStyle(`
-      @keyframes clientNeonPulse {
-        0% { filter: brightness(1.05) saturate(1.5) hue-rotate(0deg); }
-        100% { filter: brightness(1.25) saturate(2) hue-rotate(360deg); }
-      }
-      html.client-neon body {
-        animation: clientNeonPulse 1.8s ease-in-out infinite alternate;
-      }
-      html.client-neon a, html.client-neon button, html.client-neon input, html.client-neon select {
-        box-shadow: 0 0 12px rgba(0, 255, 255, 0.35);
-      }
-    `);
-    document.documentElement.classList.add('client-neon');
-  } else if (effect === 'scanlines') {
-    ensureEffectStyle(`
-      html.client-scanlines body {
-        background-image:
-          linear-gradient(rgba(255,255,255,0.08) 50%, rgba(0,0,0,0) 50%);
-        background-size: 100% 4px;
-      }
-    `);
-    document.documentElement.classList.add('client-scanlines');
-  } else if (effect === 'pulse') {
-    ensureEffectStyle(`
-      @keyframes clientPulse {
-        0% { transform: scale(1); filter: brightness(1); }
-        50% { transform: scale(1.015); filter: brightness(1.12); }
-        100% { transform: scale(1); filter: brightness(1); }
-      }
-      html.client-pulse body {
-        animation: clientPulse 1.5s ease-in-out infinite;
-      }
-    `);
-    document.documentElement.classList.add('client-pulse');
-  } else if (effect === 'spn') {
-    ensureEffectStyle(`
-      @keyframes spnPulse {
-        0% { filter: hue-rotate(0deg) brightness(1); }
-        50% { filter: hue-rotate(180deg) brightness(1.3); }
-        100% { filter: hue-rotate(360deg) brightness(1); }
-      }
-      html.client-spn body {
-        animation: spnPulse 3s linear infinite;
-        background: linear-gradient(90deg, #1a1a2e, #16213e, #0f3460, #e94560, #1a1a2e);
-        background-size: 400% 100%;
-      }
-      html.client-spn * {
-        text-shadow: 2px 2px 4px rgba(233, 69, 96, 0.8), -1px -1px 2px rgba(15, 52, 96, 0.8);
-      }
-    `);
-    document.documentElement.classList.add('client-spn');
-  }
-}
-
-function renderClients(clients) {
-  clientState.clients = clients;
-  const table = document.getElementById('clientsTable');
-  const existingRows = {};
-  table.querySelectorAll('tr').forEach(row => {
-    const username = row.cells[0]?.textContent;
-    if (username) existingRows[username] = row;
-  });
-
-  let filtered = Object.entries(clients);
-
-  if (clientState.filter === 'active') {
-    filtered = filtered.filter(([u, d]) => !d.banned && d.recent);
-  } else if (clientState.filter === 'banned') {
-    filtered = filtered.filter(([u, d]) => d.banned);
-  } else if (clientState.filter === 'inactive') {
-    filtered = filtered.filter(([u, d]) => !d.recent);
-  }
-
-  if (clientState.sortBy === 'recent') {
-    filtered.sort((a, b) => (b[1].last_ping || '').localeCompare(a[1].last_ping || ''));
-  } else if (clientState.sortBy === 'name') {
-    filtered.sort((a, b) => a[0].localeCompare(b[0]));
-  } else if (clientState.sortBy === 'url') {
-    filtered.sort((a, b) => (a[1].current_url || '').localeCompare(b[1].current_url || ''));
-  }
-
-  const activeCount = Object.values(clients).filter(d => !d.banned && d.recent).length;
-  const bannedCount = Object.values(clients).filter(d => d.banned).length;
-  const totalCount = Object.keys(clients).length;
-
-  table.innerHTML = '<tr><th>Username</th><th>Status</th><th>Last Ping</th><th>Current URL</th><th>Effect</th><th>Question</th><th>Response</th><th>Timeout</th><th>Actions</th></tr>';
-
-  filtered.forEach(([user, data]) => {
-    const row = document.createElement('tr');
-    row.className = data.recent ? 'recent' : 'inactive';
-    let statusText = '';
-    
-    if (data.banned) {
-      row.style.backgroundColor = '#ffcccc';
-      statusText = '<span style="color:red;font-weight:bold;">BANNED</span>';
-    } else {
-      statusText = (data.recent ? '<span style="color:green;">Active</span>' : 'Inactive');
-    }
-
-    const existing = existingRows[user];
-    const effectValue = existing ? (existing.querySelector('.inp-effect')?.value || data.effect || '') : (data.effect || '');
-    const urlVal = existing ? (existing.querySelector('.inp-url')?.value || '') : '';
-    const msgVal = existing ? (existing.querySelector('.inp-msg')?.value || '') : '';
-    const noteVal = existing ? (existing.querySelector('.inp-note')?.value || data.note || '') : (data.note || '');
-    const questionVal = existing ? (existing.querySelector('.inp-question')?.value || data.question || '') : (data.question || '');
-    const timeoutDurationVal = existing ? (existing.querySelector('.inp-timeout-duration')?.value || '') : '';
-    const timeoutReasonVal = existing ? (existing.querySelector('.inp-timeout-reason')?.value || data.timeout_reason || '') : (data.timeout_reason || '');
-    const answerVal = data.question_answer || '';
-
-    row.setAttribute('data-user', user);
-    row.innerHTML =
-      '<td>' + escapeHtml(user) + '</td>' +
-      '<td>' + statusText + '</td>' +
-      '<td>' + escapeHtml(data.last_ping || 'Never') + '</td>' +
-      '<td>' + (data.current_url ? '<a href="' + escapeHtml(data.current_url) + '" target="_blank">' + escapeHtml(data.current_url) + '</a>' : '<span style="color:gray;">Unknown</span>') + '</td>' +
-      '<td>' + escapeHtml(effectLabel(data.effect || '')) + '</td>' +
-      '<td>' + (data.question ? escapeHtml(data.question) : '<span style="color:gray;">None</span>') + '</td>' +
-      '<td>' + (answerVal ? '<strong>' + escapeHtml(answerVal) + '</strong>' : '<span style="color:gray;">Pending</span>') + '</td>' +
-      '<td>' + (data.timeout_active ? (
-        '<strong>' + escapeHtml(formatDurationLabel(data.timeout_remaining_seconds || 0)) + '</strong>' +
-        (data.timeout_reason ? '<br><span style="color:#555;">' + escapeHtml(data.timeout_reason) + '</span>' : '')
-      ) : '<span style="color:gray;">None</span>') + '</td>' +
-      '<td data-user="' + escapeHtml(user) + '">' +
-        '<button class="btn-ban" ' + (data.banned ? 'disabled' : '') + '>Ban</button> ' +
-        '<button class="btn-unban" ' + (!data.banned ? 'disabled' : '') + '>Unban</button> ' +
-        '<input class="inp-url" placeholder="URL" value="' + escapeHtml(urlVal) + '"><button class="btn-redirect">Redirect</button> ' +
-        '<input type="file" class="inp-img"><button class="btn-img">Image</button> ' +
-        '<input class="inp-msg" placeholder="Message" value="' + escapeHtml(msgVal) + '"><button class="btn-msg">Message</button> ' +
-        '<input class="inp-question" placeholder="Yes/No question" value="' + escapeHtml(questionVal) + '"><button class="btn-question">Ask</button> ' +
-        '<input class="inp-timeout-duration" placeholder="2m 20s" value="' + escapeHtml(timeoutDurationVal) + '"><input class="inp-timeout-reason" placeholder="Timeout reason" value="' + escapeHtml(timeoutReasonVal) + '"><button class="btn-timeout">Timeout</button> <button class="btn-timeout-clear" ' + (!data.timeout_active ? 'disabled' : '') + '>Clear Timeout</button> ' +
-        '<input class="inp-note" placeholder="Note" value="' + escapeHtml(noteVal) + '"><button class="btn-note">Save Note</button> ' +
-        '<select class="inp-effect">' + effectOptionsHtml(effectValue) + '</select><button class="btn-effect">Apply Effect</button> <button class="btn-effect-clear">Reset Effect</button> ' +
-        '<button class="btn-delete" style="color:white;background-color:red;">Delete</button>' +
-      '</td>';
-    table.appendChild(row);
-  });
-
-  document.getElementById('clientStats').textContent = 'Active: ' + activeCount + ' | Banned: ' + bannedCount + ' | Total: ' + totalCount;
-}
+var ROUTES = Object.freeze({
+  clientsJson: '/clients.json',
+  clientBan: '/clients/ban',
+  clientUnban: '/clients/unban',
+  clientDelete: '/clients/delete',
+  clientMessage: '/clients/message',
+  clientQuestion: '/clients/question',
+  clientTimeout: '/clients/timeout',
+  clientTimeoutClear: '/clients/timeout/clear',
+  clientRedirect: '/clients/redirect',
+  clientEffect: '/clients/effect',
+  clientNote: '/clients/note',
+  clientForceUrl: '/clients/forceurl',
+  clientImage: '/clients/image',
+  lockdown: '/lockdown',
+  lockdownJson: '/lockdown.json'
+});
 
 function loadClients() {
   var current = ++requestSeq;
@@ -433,6 +78,161 @@ function loadClients() {
     });
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function effectLabel(effect) {
+  var map = {
+    '': 'No Effect',
+    invert: 'Invert Colors',
+    mirror: 'Mirror Flip',
+    sepia: 'Sepia',
+    gray: 'Grayscale',
+    comic: 'Comic Mode',
+    zoom: 'Zoom Pop',
+    blur: 'Blur',
+    neon: 'Neon Glow',
+    scanlines: 'Scanlines',
+    pulse: 'Pulse',
+    spn: 'SPN Screen'
+  };
+  return map[effect] || 'No Effect';
+}
+
+function effectOptionsHtml(selected) {
+  var EFFECTS = [
+    { value: '', label: 'No Effect' },
+    { value: 'invert', label: 'Invert Colors' },
+    { value: 'mirror', label: 'Mirror Flip' },
+    { value: 'sepia', label: 'Sepia' },
+    { value: 'gray', label: 'Grayscale' },
+    { value: 'comic', label: 'Comic Mode' },
+    { value: 'zoom', label: 'Zoom Pop' },
+    { value: 'blur', label: 'Blur' },
+    { value: 'neon', label: 'Neon Glow' },
+    { value: 'scanlines', label: 'Scanlines' },
+    { value: 'pulse', label: 'Pulse' },
+    { value: 'spn', label: 'SPN Screen' }
+  ];
+  return EFFECTS.map(function(effect) {
+    return '<option value="' + effect.value + '"' + (effect.value === selected ? ' selected' : '') + '>' + effect.label + '</option>';
+  }).join('');
+}
+
+function formatDurationLabel(seconds) {
+  seconds = Math.max(0, Math.floor(seconds || 0));
+  var minutes = Math.floor(seconds / 60);
+  var remainder = seconds % 60;
+  if (minutes > 0) {
+    return minutes + 'm ' + String(remainder).padStart(2, '0') + 's';
+  }
+  return remainder + 's';
+}
+
+function renderClients(clients) {
+  clientState.clients = clients;
+  var table = document.getElementById('clientsTable');
+  var existingRows = {};
+  table.querySelectorAll('tr').forEach(function(row) {
+    var username = row.cells[0]?.textContent;
+    if (username) existingRows[username] = row;
+  });
+
+  var filtered = Object.entries(clients);
+
+  if (clientState.filter === 'active') {
+    filtered = filtered.filter(function(entry) { return !entry[1].banned && entry[1].recent; });
+  } else if (clientState.filter === 'banned') {
+    filtered = filtered.filter(function(entry) { return entry[1].banned; });
+  } else if (clientState.filter === 'inactive') {
+    filtered = filtered.filter(function(entry) { return !entry[1].recent; });
+  }
+
+  if (clientState.sortBy === 'recent') {
+    filtered.sort(function(a, b) { return (b[1].last_ping || '').localeCompare(a[1].last_ping || ''); });
+  } else if (clientState.sortBy === 'name') {
+    filtered.sort(function(a, b) { return a[0].localeCompare(b[0]); });
+  } else if (clientState.sortBy === 'url') {
+    filtered.sort(function(a, b) { return (a[1].current_url || '').localeCompare(b[1].current_url || ''); });
+  }
+
+  var activeCount = Object.values(clients).filter(function(d) { return !d.banned && d.recent; }).length;
+  var bannedCount = Object.values(clients).filter(function(d) { return d.banned; }).length;
+  var timeoutCount = Object.values(clients).filter(function(d) { return d.timeout_active; }).length;
+  var totalCount = Object.keys(clients).length;
+
+  table.innerHTML = '<tr><th>Username</th><th>Status</th><th>Last Ping</th><th>Current URL</th><th>Effect</th><th>Question</th><th>Response</th><th>Actions</th></tr>';
+
+  filtered.forEach(function(entry) {
+    var user = entry[0];
+    var data = entry[1];
+    var row = document.createElement('tr');
+    row.className = data.recent ? 'recent' : 'inactive';
+    var statusText = '';
+
+    var statusInfo = '';
+    var statusBg = '';
+    if (data.banned) {
+      statusInfo = '<span style="color:blue;font-weight:bold;">Banned</span>';
+      statusBg = '#ccddff';
+    } else if (data.timeout_active) {
+      statusInfo = '<span style="color:orange;font-weight:bold;">Timeout ' + formatDurationLabel(data.timeout_remaining_seconds || 0) + '</span>';
+      statusBg = '#ffe4b5';
+    } else if (data.force_url) {
+      statusInfo = '<span style="color:blue;font-weight:bold;">Force URL</span>';
+      statusBg = '#ccddff';
+    }
+    if (statusInfo) {
+      var onlineStatus = data.recent ? 'Online' : 'Offline';
+      statusText = '<span style="color:' + (data.recent ? 'green' : 'gray') + ';">' + onlineStatus + '</span> (' + statusInfo + ')';
+      row.style.backgroundColor = statusBg;
+    } else {
+      statusText = (data.recent ? '<span style="color:green;">Active</span>' : 'Inactive');
+    }
+
+    var existing = existingRows[user];
+    var effectValue = existing ? (existing.querySelector('.inp-effect')?.value || data.effect || '') : (data.effect || '');
+    var urlVal = existing ? (existing.querySelector('.inp-url')?.value || '') : '';
+    var msgVal = existing ? (existing.querySelector('.inp-msg')?.value || '') : '';
+    var noteVal = existing ? (existing.querySelector('.inp-note')?.value || data.note || '') : (data.note || '');
+    var questionVal = existing ? (existing.querySelector('.inp-question')?.value || data.question || '') : (data.question || '');
+    var timeoutDurationVal = existing ? (existing.querySelector('.inp-timeout-duration')?.value || '') : '';
+    var timeoutReasonVal = existing ? (existing.querySelector('.inp-timeout-reason')?.value || data.timeout_reason || '') : (data.timeout_reason || '');
+    var answerVal = data.question_answer || '';
+
+    row.setAttribute('data-user', user);
+    row.innerHTML =
+      '<td>' + escapeHtml(user) + '</td>' +
+      '<td>' + statusText + '</td>' +
+      '<td>' + escapeHtml(data.last_ping || 'Never') + '</td>' +
+      '<td>' + (data.current_url ? '<a href="' + escapeHtml(data.current_url) + '" target="_blank">' + escapeHtml(data.current_url) + '</a>' : '<span style="color:gray;">Unknown</span>') + '</td>' +
+      '<td>' + escapeHtml(effectLabel(data.effect || '')) + '</td>' +
+      '<td>' + (data.question ? escapeHtml(data.question) : '<span style="color:gray;">None</span>') + '</td>' +
+      '<td>' + (answerVal ? '<strong>' + escapeHtml(answerVal) + '</strong>' : '<span style="color:gray;">Pending</span>') + '</td>' +
+      '<td data-user="' + escapeHtml(user) + '">' +
+        '<div class="action-group ban-group" style="background-color: #ffcccc;"><button class="btn-toggle-ban" style="background-color:#ff4444;color:white;" ' + (data.timeout_active ? 'disabled' : '') + '>' + (data.banned ? 'Unban' : 'Ban') + '</button></div>' +
+        '<div class="action-group redirect-group" style="background-color: #cce5ff;"><input class="inp-url" placeholder="URL" value="' + escapeHtml(urlVal) + '"><button class="btn-redirect" style="background-color:#0066cc;color:white;">Redirect</button></div>' +
+        '<div class="action-group image-group" style="background-color: #e6ccff;"><input type="file" class="inp-img"><button class="btn-img" style="background-color:#9900cc;color:white;">Image</button></div>' +
+        '<div class="action-group message-group" style="background-color: #ccffcc;"><input class="inp-msg" placeholder="Message" value="' + escapeHtml(msgVal) + '"><button class="btn-msg" style="background-color:#00cc00;color:white;">Message</button></div>' +
+        '<div class="action-group question-group" style="background-color: #ffe0cc;"><input class="inp-question" placeholder="Yes/No question" value="' + escapeHtml(questionVal) + '"><button class="btn-question" style="background-color:#cc6600;color:white;">Ask</button> <button class="btn-clear-question" style="background-color:#cc9933;color:white;">Clear Ask</button></div>' +
+        '<div class="action-group timeout-group" style="background-color: #ffcccc;">' + (data.timeout_active ? '<button class="btn-untimeout" style="background-color:#cc0066;color:white;">Untimeout</button>' : '<input class="inp-timeout-duration" placeholder="2m 20s" value="' + escapeHtml(timeoutDurationVal) + '"><input class="inp-timeout-reason" placeholder="Timeout reason" value="' + escapeHtml(timeoutReasonVal) + '"><button class="btn-timeout" style="background-color:#cc0066;color:white;" ' + (data.banned ? 'disabled' : '') + '>Timeout</button>') + '</div>' +
+        '<div class="action-group forceurl-group" style="background-color: #ccddee;"><input class="inp-forceurl" placeholder="Force URL" value="' + escapeHtml(data.force_url || '') + '"><button class="btn-forceurl" style="background-color:#336699;color:white;">Set</button><button class="btn-forceurl-clear" style="background-color:#996633;color:white;">Clear</button></div>' +
+        '<div class="action-group note-group" style="background-color: #ccffcc;"><input class="inp-note" placeholder="Note" value="' + escapeHtml(noteVal) + '"><button class="btn-note" style="background-color:#009900;color:white;">Save Note</button></div>' +
+        '<div class="action-group effect-group" style="background-color: #e6ccff;"><select class="inp-effect">' + effectOptionsHtml(effectValue) + '</select><button class="btn-effect" style="background-color:#6600cc;color:white;">Apply Effect</button> <button class="btn-effect-clear" style="background-color:#9966cc;color:white;">Reset Effect</button></div>' +
+        '<div class="action-group delete-group" style="background-color: #ffcccc;"><button class="btn-delete" style="background-color:#cc0000;color:white;">Delete</button></div>' +
+      '</td>';
+    table.appendChild(row);
+  });
+
+  document.getElementById('clientStats').textContent = 'Active: ' + activeCount + ' | Banned: ' + bannedCount + ' | Timed Out: ' + timeoutCount + ' | Total: ' + totalCount;
+}
+
 function banClient(btn) {
   var user = btn.closest('td').getAttribute('data-user');
   return fetch(ROUTES.clientBan, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
@@ -441,6 +241,16 @@ function banClient(btn) {
 function unbanClient(btn) {
   var user = btn.closest('td').getAttribute('data-user');
   return fetch(ROUTES.clientUnban, {method: 'POST', body: 'username=' + encodeURIComponent(user), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+}
+
+function toggleBan(btn) {
+  var user = btn.closest('td').getAttribute('data-user');
+  var data = clientState.clients[user];
+  if (data && data.banned) {
+    unbanClient(btn);
+  } else {
+    banClient(btn);
+  }
 }
 
 function deleteClient(btn) {
@@ -461,6 +271,11 @@ function sendRedirect(btn, url) {
   return fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&u=' + encodeRouteValue(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
+function sendForceUrl(btn, url) {
+  var user = btn.closest('td').getAttribute('data-user');
+  return fetch(ROUTES.clientForceUrl, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url || ''), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+}
+
 function sendEffect(btn, effect) {
   var user = btn.closest('td').getAttribute('data-user');
   return fetch(ROUTES.clientEffect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&effect=' + encodeURIComponent(effect || ''), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
@@ -473,8 +288,7 @@ function sendNote(btn, note) {
 
 function sendQuestion(btn, question) {
   var user = btn.closest('td').getAttribute('data-user');
-  if (!question) return;
-  return fetch(ROUTES.clientQuestion, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&question=' + encodeURIComponent(question), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
+  return fetch(ROUTES.clientQuestion, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&question=' + encodeURIComponent(question || ''), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function sendTimeout(btn, duration, reason) {
@@ -495,6 +309,8 @@ function clearClientTimeout(btn) {
     headers: {'Content-Type': 'application/x-www-form-urlencoded'}
   }).then(loadClients);
 }
+
+
 
 function formatDurationLabel(seconds) {
   seconds = Math.max(0, Math.floor(seconds || 0));
@@ -553,9 +369,8 @@ function toggleAutoRefresh() {
   }
 }
 
-function toggleLockdown(url, duration) {
-  var targetUrl = url || 'https://www.google.com';
-  var body = 'action=on&u=' + encodeRouteValue(targetUrl);
+function toggleLockdown(duration) {
+  var body = 'action=on';
   if (duration) {
     body += '&duration=' + encodeURIComponent(duration);
   }
@@ -579,9 +394,7 @@ function disableLockdown() {
 function promptLockdown() {
   var duration = prompt("Enter lockdown duration in minutes (leave empty for indefinite):", "7");
   if (duration === null) return;
-  var url = prompt("Enter URL to redirect locked clients to:", "https://www.google.com");
-  if (url === null) return;
-  toggleLockdown(url, duration || '');
+  toggleLockdown(duration || '');
 }
 
 function updateLockdownBtn() {
@@ -622,11 +435,16 @@ if (clientsTable) {
       banClient(btn);
     } else if (btn.classList.contains('btn-unban')) {
       unbanClient(btn);
+    } else if (btn.classList.contains('btn-toggle-ban')) {
+      toggleBan(btn);
     } else if (btn.classList.contains('btn-delete')) {
       deleteClient(btn);
     } else if (btn.classList.contains('btn-redirect')) {
       var url = td.querySelector('.inp-url').value;
       sendRedirect(btn, url);
+    } else if (btn.classList.contains('btn-forceurl') || btn.classList.contains('btn-forceurl-clear')) {
+      var forceurl = btn.classList.contains('btn-forceurl-clear') ? '' : td.querySelector('.inp-forceurl').value;
+      sendForceUrl(btn, forceurl);
     } else if (btn.classList.contains('btn-msg')) {
       var msg = td.querySelector('.inp-msg').value;
       sendMessage(btn, msg);
@@ -646,9 +464,11 @@ if (clientsTable) {
       sendNote(btn, td.querySelector('.inp-note').value);
     } else if (btn.classList.contains('btn-question')) {
       sendQuestion(btn, td.querySelector('.inp-question').value);
+    } else if (btn.classList.contains('btn-clear-question')) {
+      sendQuestion(btn, '');
     } else if (btn.classList.contains('btn-timeout')) {
       sendTimeout(btn, td.querySelector('.inp-timeout-duration').value, td.querySelector('.inp-timeout-reason').value);
-    } else if (btn.classList.contains('btn-timeout-clear')) {
+    } else if (btn.classList.contains('btn-timeout-clear') || btn.classList.contains('btn-untimeout')) {
       clearClientTimeout(btn);
     }
   });
@@ -804,7 +624,36 @@ function showIdAllClients() {
       });
     }
 
-    function sendImageFileToAllActive(input) {
+    function setForceUrlAllActive() {
+  var url = prompt("Enter URL to force ALL active clients to:");
+  if (!url) return;
+
+  fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
+    var promises = [];
+    for (var [user, data] of Object.entries(clients)) {
+      if (data.recent) {
+        promises.push(fetch(ROUTES.clientForceUrl, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+      }
+    }
+    Promise.all(promises).then(loadClients);
+  });
+}
+
+function clearForceUrlAllActive() {
+  if (!confirm("Clear Force URL for all clients?")) return;
+
+  fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
+    var promises = [];
+    for (var [user, data] of Object.entries(clients)) {
+      if (data.force_url) {
+        promises.push(fetch(ROUTES.clientForceUrl, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=', headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
+      }
+    }
+    Promise.all(promises).then(loadClients);
+  });
+}
+
+function sendImageFileToAllActive(input) {
       const f = input.files[0];
       if (!f) return;
       if (!confirm("Send this image to all active clients?")) return;

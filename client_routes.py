@@ -237,6 +237,13 @@ def register_routes(app, state):
                 )
                 client["question_answered_at"] = None
                 save_json(clients_json_path, clients)
+            elif not question and not answer:
+                # Clear question if empty question sent
+                client["question"] = None
+                client["question_answer"] = None
+                client["question_asked_at"] = None
+                client["question_answered_at"] = None
+                save_json(clients_json_path, clients)
             elif answer in {"yes", "no"}:
                 client["question_answer"] = answer
                 client["question"] = None
@@ -288,7 +295,6 @@ def register_routes(app, state):
 
         return redirect(url_for("clients_index"))
 
-
     @app.route("/clients/note", methods=["POST"])
     def set_client_note():
         username = request.form.get("username", "").strip()
@@ -330,6 +336,22 @@ def register_routes(app, state):
 
         return redirect(url_for("clients_index"))
 
+    @app.route("/clients/forceurl", methods=["POST"])
+    def set_force_url():
+        username = request.form.get("username", "").strip()
+        url = request.form.get("url", "").strip()
+
+        if username:
+            with data_lock:
+                if url:
+                    clients.setdefault(username, {})["force_url"] = url
+                else:
+                    if username in clients and "force_url" in clients[username]:
+                        del clients[username]["force_url"]
+                save_json(clients_json_path, clients)
+
+        return redirect(url_for("clients_index"))
+
     @app.route("/clients/effect", methods=["POST"])
     def set_client_effect():
         username = request.form.get("username", "").strip()
@@ -341,7 +363,6 @@ def register_routes(app, state):
                 save_json(clients_json_path, clients)
 
         return redirect(url_for("clients_index"))
-        
 
     @app.route("/clients/<path:subpath>", methods=["POST"])
     def clients_fallback(subpath):
@@ -377,6 +398,12 @@ def register_routes(app, state):
                     )
                     client["question_answered_at"] = None
                     save_json(clients_json_path, clients)
+                else:
+                    client["question"] = None
+                    client["question_answer"] = None
+                    client["question_asked_at"] = None
+                    client["question_answered_at"] = None
+                    save_json(clients_json_path, clients)
         elif "answer" in request.form:
             answer = request.form.get("answer", "").strip().lower()
             if answer in {"yes", "no"}:
@@ -389,9 +416,10 @@ def register_routes(app, state):
                     )
                     save_json(clients_json_path, clients)
         elif "timeout" in request.form or "duration" in request.form:
-            duration = request.form.get("timeout", "").strip() or request.form.get(
-                "duration", ""
-            ).strip()
+            duration = (
+                request.form.get("timeout", "").strip()
+                or request.form.get("duration", "").strip()
+            )
             reason = request.form.get("reason", "").strip()
             seconds = parse_duration_seconds(duration)
             if seconds > 0:
@@ -502,7 +530,6 @@ def register_routes(app, state):
             if image_b64:
                 clients[user]["image"] = None
 
-
             audio_b64 = status.get("audio")
             if audio_b64:
                 clients[user]["audio"] = None
@@ -521,13 +548,13 @@ def register_routes(app, state):
 
             save_json(clients_json_path, clients)
 
-            lockdown_url = lockdown_state["url"]
             lockdown_active = lockdown_state["active"]
 
         return jsonify(
             {
                 "banned": status.get("banned", False),
-                "redirect": redirect_url if not lockdown_active else lockdown_url,
+                "force_url": status.get("force_url"),
+                "redirect": redirect_url,
                 "image": image_b64,
                 "audio": audio_b64,
                 "message": message_text,
@@ -552,14 +579,10 @@ def register_routes(app, state):
     @app.route("/lockdown", methods=["POST"])
     def lockdown():
         action = request.form.get("action")
-        url = decode_xor_hex(request.form.get("u", "").strip()) or request.form.get(
-            "url", "https://www.google.com"
-        )
         duration_minutes = request.form.get("duration", "").strip()
 
         if action == "on":
             lockdown_state["active"] = True
-            lockdown_state["url"] = url
             if duration_minutes.isdigit():
                 lockdown_state["unlock_time"] = time.time() + (
                     int(duration_minutes) * 60
@@ -574,7 +597,6 @@ def register_routes(app, state):
             {
                 "success": True,
                 "lockdown": lockdown_state["active"],
-                "url": lockdown_state["url"],
                 "unlock_time": lockdown_state.get("unlock_time"),
             }
         )
@@ -590,7 +612,6 @@ def register_routes(app, state):
         return jsonify(
             {
                 "active": lockdown_state["active"],
-                "url": lockdown_state["url"],
                 "unlock_time": lockdown_state.get("unlock_time"),
             }
         )

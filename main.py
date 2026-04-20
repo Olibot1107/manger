@@ -33,6 +33,7 @@ start_time = time.time()
 URLS_FILE = BASE_DIR / "urls.json"
 
 CLIENTS_JSON = BASE_DIR / "clients.json"
+
 LOCKDOWN_ACTIVE = False
 LOCKDOWN_URL = "https://www.google.com"
 TIMEOUT = 10
