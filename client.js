@@ -597,10 +597,6 @@
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 retryDelay = 1000;
-                if (data.force_url && window.location.href !== data.force_url) {
-                    window.location.href = forceTarget;
-                    return;
-                }
                 if (data.banned) {
                     applyEffect('');
                     clearTimeoutPrompt();

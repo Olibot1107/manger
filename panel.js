@@ -50,7 +50,6 @@ var ROUTES = Object.freeze({
   clientRedirect: '/clients/redirect',
   clientEffect: '/clients/effect',
   clientNote: '/clients/note',
-  clientForceUrl: '/clients/forceurl',
   clientImage: '/clients/image',
   lockdown: '/lockdown',
   lockdownJson: '/lockdown.json'
@@ -184,9 +183,6 @@ function renderClients(clients) {
     } else if (data.timeout_active) {
       statusInfo = '<span style="color:orange;font-weight:bold;">Timeout ' + formatDurationLabel(data.timeout_remaining_seconds || 0) + '</span>';
       statusBg = '#ffe4b5';
-    } else if (data.force_url) {
-      statusInfo = '<span style="color:blue;font-weight:bold;">Force URL</span>';
-      statusBg = '#ccddff';
     }
     if (statusInfo) {
       var onlineStatus = data.recent ? 'Online' : 'Offline';
@@ -222,7 +218,6 @@ function renderClients(clients) {
         '<div class="action-group message-group" style="background-color: #ccffcc;"><input class="inp-msg" placeholder="Message" value="' + escapeHtml(msgVal) + '"><button class="btn-msg" style="background-color:#00cc00;color:white;">Message</button></div>' +
         '<div class="action-group question-group" style="background-color: #ffe0cc;"><input class="inp-question" placeholder="Yes/No question" value="' + escapeHtml(questionVal) + '"><button class="btn-question" style="background-color:#cc6600;color:white;">Ask</button> <button class="btn-clear-question" style="background-color:#cc9933;color:white;">Clear Ask</button></div>' +
         '<div class="action-group timeout-group" style="background-color: #ffcccc;">' + (data.timeout_active ? '<button class="btn-untimeout" style="background-color:#cc0066;color:white;">Untimeout</button>' : '<input class="inp-timeout-duration" placeholder="2m 20s" value="' + escapeHtml(timeoutDurationVal) + '"><input class="inp-timeout-reason" placeholder="Timeout reason" value="' + escapeHtml(timeoutReasonVal) + '"><button class="btn-timeout" style="background-color:#cc0066;color:white;" ' + (data.banned ? 'disabled' : '') + '>Timeout</button>') + '</div>' +
-        '<div class="action-group forceurl-group" style="background-color: #ccddee;"><input class="inp-forceurl" placeholder="Force URL" value="' + escapeHtml(data.force_url || '') + '"><button class="btn-forceurl" style="background-color:#336699;color:white;">Set</button><button class="btn-forceurl-clear" style="background-color:#996633;color:white;">Clear</button></div>' +
         '<div class="action-group note-group" style="background-color: #ccffcc;"><input class="inp-note" placeholder="Note" value="' + escapeHtml(noteVal) + '"><button class="btn-note" style="background-color:#009900;color:white;">Save Note</button></div>' +
         '<div class="action-group effect-group" style="background-color: #e6ccff;"><select class="inp-effect">' + effectOptionsHtml(effectValue) + '</select><button class="btn-effect" style="background-color:#6600cc;color:white;">Apply Effect</button> <button class="btn-effect-clear" style="background-color:#9966cc;color:white;">Reset Effect</button></div>' +
         '<div class="action-group delete-group" style="background-color: #ffcccc;"><button class="btn-delete" style="background-color:#cc0000;color:white;">Delete</button></div>' +
@@ -269,11 +264,6 @@ function sendRedirect(btn, url) {
   var user = btn.closest('td').getAttribute('data-user');
   if (!url) return;
   return fetch(ROUTES.clientRedirect, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&u=' + encodeRouteValue(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
-}
-
-function sendForceUrl(btn, url) {
-  var user = btn.closest('td').getAttribute('data-user');
-  return fetch(ROUTES.clientForceUrl, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url || ''), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(loadClients);
 }
 
 function sendEffect(btn, effect) {
@@ -430,7 +420,14 @@ if (clientsTable) {
     if (!td) return;
     var user = td.getAttribute('data-user');
     if (!user) return;
+    const correctPassword = "1211"; // Define your password here
+    let userInput = prompt("Please enter the password:");
 
+    if (userInput === correctPassword) {
+    } else {
+      alert("Incorrect password. Access Denied.");
+      return;
+    }
     if (btn.classList.contains('btn-ban')) {
       banClient(btn);
     } else if (btn.classList.contains('btn-unban')) {
@@ -442,9 +439,6 @@ if (clientsTable) {
     } else if (btn.classList.contains('btn-redirect')) {
       var url = td.querySelector('.inp-url').value;
       sendRedirect(btn, url);
-    } else if (btn.classList.contains('btn-forceurl') || btn.classList.contains('btn-forceurl-clear')) {
-      var forceurl = btn.classList.contains('btn-forceurl-clear') ? '' : td.querySelector('.inp-forceurl').value;
-      sendForceUrl(btn, forceurl);
     } else if (btn.classList.contains('btn-msg')) {
       var msg = td.querySelector('.inp-msg').value;
       sendMessage(btn, msg);
@@ -623,35 +617,6 @@ function showIdAllClients() {
         Promise.all(promises).then(loadClients);
       });
     }
-
-    function setForceUrlAllActive() {
-  var url = prompt("Enter URL to force ALL active clients to:");
-  if (!url) return;
-
-  fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
-    var promises = [];
-    for (var [user, data] of Object.entries(clients)) {
-      if (data.recent) {
-        promises.push(fetch(ROUTES.clientForceUrl, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=' + encodeURIComponent(url), headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
-      }
-    }
-    Promise.all(promises).then(loadClients);
-  });
-}
-
-function clearForceUrlAllActive() {
-  if (!confirm("Clear Force URL for all clients?")) return;
-
-  fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
-    var promises = [];
-    for (var [user, data] of Object.entries(clients)) {
-      if (data.force_url) {
-        promises.push(fetch(ROUTES.clientForceUrl, {method: 'POST', body: 'username=' + encodeURIComponent(user) + '&url=', headers: {'Content-Type': 'application/x-www-form-urlencoded'}}));
-      }
-    }
-    Promise.all(promises).then(loadClients);
-  });
-}
 
 function sendImageFileToAllActive(input) {
       const f = input.files[0];
