@@ -714,64 +714,45 @@ function rickrollAllClients() {
 }
 
 // ============================================
-// PASSWORD CONFIGURATION SYSTEM
+// PASSWORD AUTH SYSTEM — EDIT THIS SECTION ONLY
 // ============================================
-// Add multiple passwords with different permission levels
-// Each password can have specific actions allowed or denied
 
 var PASSWORD_CONFIG = {
-  // List of passwords with their permissions
+  // Session timeout in minutes (0 = no timeout)
+  sessionTimeoutMinutes: 30,
+
+  // Hardcoded accounts — add/edit/remove here only
   passwords: [
     {
       password: "1211",
-      label: "Admin",
-      // 'allow' means ONLY these actions are permitted (whitelist)
-      // 'deny' means these actions are blocked (blacklist)
-      // If both are empty, all actions are allowed
-      mode: "deny", // "allow" = whitelist, "deny" = blacklist
-      allowedActions: [], // empty = all allowed when mode is "deny" with empty deniedActions
-      deniedActions: []   // empty = none denied
-    },
-    {
-      password: "helper123",
-      label: "Helper",
-      mode: "deny",
-      allowedActions: [],
-      deniedActions: ["ban", "unban", "toggleBan", "delete", "deleteAll", "lockdown", "rickroll"]
+      label: "ojdaw",
+      mode: "deny",        // "deny" = blacklist (allow all except deniedActions)
+      allowedActions: [],  // ignored in deny mode
+      deniedActions: []    // empty = full access
     },
     {
       password: "viewer",
       label: "Viewer",
-      mode: "allow",
-      allowedActions: [], // empty array with mode "allow" = view-only (no actions)
-      deniedActions: []
+      mode: "allow",       // "allow" = whitelist (block all except allowedActions)
+      allowedActions: [],  // empty = view-only, nothing allowed
+      deniedActions: []    // ignored in allow mode
     }
-  ],
-
-  // Action names that can be restricted:
-  // "ban", "unban", "toggleBan", "delete", "redirect", "message", "image",
-  // "effect", "note", "question", "timeout", "untimeout",
-  // "banAll", "unbanAll", "deleteAll", "redirectAll", "messageAll",
-  // "askAll", "showIdAll", "sendImageAll", "lockdown", "rickroll"
-
-  // Session timeout in minutes (0 = no timeout)
-  sessionTimeoutMinutes: 30,
-
-  // Whether to show which actions are blocked in the prompt
-  showBlockedActions: true
+  ]
 };
 
-// Session state for password authentication
+// Available action names for reference:
+// ban, unban, toggleBan, delete, redirect, message, image, effect, note,
+// question, timeout, untimeout, banAll, unbanAll, deleteAll, redirectAll,
+// messageAll, askAll, showIdAll, sendImageAll, lockdown, rickroll
+
 var authSession = {
   authenticated: false,
-  currentPassword: null,
   currentLabel: null,
   currentPermissions: null,
   loginTime: null,
   timer: null
 };
 
-// Check if current session is still valid
 function isSessionValid() {
   if (!authSession.authenticated) return false;
   if (PASSWORD_CONFIG.sessionTimeoutMinutes <= 0) return true;
@@ -779,54 +760,29 @@ function isSessionValid() {
   return elapsed < PASSWORD_CONFIG.sessionTimeoutMinutes;
 }
 
-// Check if a specific action is allowed for the current user
 function isActionAllowed(actionName) {
   if (!authSession.authenticated || !isSessionValid()) return false;
-  if (!authSession.currentPermissions) return false;
-
   var perms = authSession.currentPermissions;
-
   if (perms.mode === "allow") {
-    // Whitelist mode: only allowed actions permitted
-    if (perms.allowedActions.length === 0) return false; // view-only
+    if (perms.allowedActions.length === 0) return false;
     return perms.allowedActions.indexOf(actionName) !== -1;
   } else {
-    // Blacklist mode: all actions except denied ones
     return perms.deniedActions.indexOf(actionName) === -1;
   }
 }
 
-// Get list of blocked actions for display
-function getBlockedActions() {
-  if (!authSession.currentPermissions) return [];
-  var perms = authSession.currentPermissions;
-  var allActions = ["ban", "unban", "toggleBan", "delete", "redirect", "message", "image",
-    "effect", "note", "question", "timeout", "untimeout",
-    "banAll", "unbanAll", "deleteAll", "redirectAll", "messageAll",
-    "askAll", "showIdAll", "sendImageAll", "lockdown", "rickroll"];
-
-  return allActions.filter(function(action) {
-    return !isActionAllowed(action);
-  });
-}
-
-// Prompt for password and validate
 function pass(actionName) {
-  // If already authenticated and session valid, check permission
   if (authSession.authenticated && isSessionValid()) {
     if (!isActionAllowed(actionName)) {
-      var blocked = getBlockedActions();
-      alert("Access Denied: Your account (" + authSession.currentLabel + ") does not have permission to perform this action.\n\nBlocked actions: " + blocked.join(", "));
+      alert("Access Denied: Your account (" + authSession.currentLabel + ") cannot do this.");
       return false;
     }
-    return true; // Already authenticated and allowed
+    return true;
   }
 
-  // Need to authenticate
-  var userInput = prompt("Enter password for action: " + (actionName || "general"));
+  var userInput = prompt("Enter password:");
   if (!userInput) return false;
 
-  // Find matching password in config
   var matched = null;
   for (var i = 0; i < PASSWORD_CONFIG.passwords.length; i++) {
     if (PASSWORD_CONFIG.passwords[i].password === userInput) {
@@ -836,13 +792,11 @@ function pass(actionName) {
   }
 
   if (!matched) {
-    alert("Incorrect password. Access Denied.");
+    alert("Wrong password.");
     return false;
   }
 
-  // Set session
   authSession.authenticated = true;
-  authSession.currentPassword = matched.password;
   authSession.currentLabel = matched.label;
   authSession.currentPermissions = {
     mode: matched.mode,
@@ -851,221 +805,61 @@ function pass(actionName) {
   };
   authSession.loginTime = Date.now();
 
-  // Set session timeout timer
   if (authSession.timer) clearTimeout(authSession.timer);
   if (PASSWORD_CONFIG.sessionTimeoutMinutes > 0) {
     authSession.timer = setTimeout(function() {
       authSession.authenticated = false;
-      authSession.currentPassword = null;
-      authSession.currentLabel = null;
-      authSession.currentPermissions = null;
-      alert("Session expired. Please log in again.");
+      alert("Session expired.");
+      updateAuthStatus();
     }, PASSWORD_CONFIG.sessionTimeoutMinutes * 60 * 1000);
   }
 
-  // Now check if the requested action is allowed
   if (!isActionAllowed(actionName)) {
-    var blocked = getBlockedActions();
-    var msg = "Authenticated as: " + matched.label + "\n\n";
-    msg += "This action is NOT permitted with your account.\n";
-    if (PASSWORD_CONFIG.showBlockedActions && blocked.length > 0) {
-      msg += "\nYour blocked actions: " + blocked.join(", ");
-    }
-    alert(msg);
+    alert("Authenticated as " + matched.label + " — but this action is blocked for you.");
     return false;
   }
 
-  alert("Authenticated as: " + matched.label + " — Access Granted.");
+  updateAuthStatus();
   return true;
 }
 
-// Logout function
 function logout() {
   authSession.authenticated = false;
-  authSession.currentPassword = null;
   authSession.currentLabel = null;
   authSession.currentPermissions = null;
   authSession.loginTime = null;
   if (authSession.timer) clearTimeout(authSession.timer);
   authSession.timer = null;
-  alert("Logged out successfully.");
   updateAuthStatus();
 }
 
-// Update auth status display in UI
 function updateAuthStatus() {
-  var statusEl = document.getElementById('authStatus');
-  if (!statusEl) return;
-
+  var el = document.getElementById('authStatus');
+  if (!el) return;
   if (authSession.authenticated && isSessionValid()) {
     var remaining = "";
     if (PASSWORD_CONFIG.sessionTimeoutMinutes > 0) {
-      var elapsed = (Date.now() - authSession.loginTime) / 1000 / 60;
-      var mins = Math.max(0, Math.round(PASSWORD_CONFIG.sessionTimeoutMinutes - elapsed));
-      remaining = " (" + mins + "m left)";
+      var mins = Math.max(0, Math.round(PASSWORD_CONFIG.sessionTimeoutMinutes - (Date.now() - authSession.loginTime) / 1000 / 60));
+      remaining = " (" + mins + "m)";
     }
-    statusEl.innerHTML = '<span style="color:green;">● Logged in as ' + escapeHtml(authSession.currentLabel) + remaining + '</span> <button onclick="logout()" style="margin-left:8px;">Logout</button>';
+    el.innerHTML = '<span style="color:lime;">● ' + escapeHtml(authSession.currentLabel) + remaining + '</span> <button onclick="logout()" style="margin-left:6px;font-size:11px;">Logout</button>';
   } else {
-    statusEl.innerHTML = '<span style="color:red;">● Not logged in</span>';
+    el.innerHTML = '<span style="color:red;">● Not logged in</span>';
   }
 }
 
-// Periodically update auth status (for session timeout display)
-setInterval(updateAuthStatus, 30000);
-
-// ============================================
-// AUTH UI INJECTION
-// ============================================
-
-function injectAuthUI() {
-  // Create auth status bar
-  var authBar = document.createElement('div');
-  authBar.id = 'authBar';
-  authBar.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;padding:8px 12px;background:#1a1a2e;color:#fff;font-family:sans-serif;font-size:13px;border-bottom-left-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
-  authBar.innerHTML = '<span id="authStatus"><span style="color:red;">● Not logged in</span></span>';
-  document.body.appendChild(authBar);
-  updateAuthStatus();
-
-  // Create password config panel (collapsible, at bottom)
-  var panel = document.createElement('div');
-  panel.id = 'passwordConfigPanel';
-  panel.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;width:380px;max-height:500px;overflow-y:auto;background:#16213e;color:#e94560;border:2px solid #e94560;border-radius:12px;padding:16px;font-family:sans-serif;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,0.5);display:none;';
-
-  panel.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-    '  <h3 style="margin:0;color:#e94560;font-size:16px;">🔐 Password Config</h3>' +
-    '  <button onclick="document.getElementById(\'passwordConfigPanel\').style.display=\'none\'" style="background:#e94560;color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;">✕</button>' +
-    '</div>' +
-    '<div id="passwordConfigContent"></div>' +
-    '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #333;">' +
-    '  <button onclick="savePasswordConfig()" style="background:#0f3460;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:12px;margin-right:6px;">💾 Save Config</button>' +
-    '  <button onclick="resetPasswordConfig()" style="background:#533483;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:12px;">↺ Reset</button>' +
-    '</div>';
-
-  document.body.appendChild(panel);
-
-  // Create toggle button
-  var toggleBtn = document.createElement('button');
-  toggleBtn.id = 'passwordConfigToggle';
-  toggleBtn.textContent = '🔐 Passwords';
-  toggleBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9998;background:#e94560;color:#fff;border:none;border-radius:8px;padding:10px 16px;cursor:pointer;font-family:sans-serif;font-size:13px;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
-  toggleBtn.onclick = function() {
-    var p = document.getElementById('passwordConfigPanel');
-    p.style.display = p.style.display === 'none' ? 'block' : 'none';
-    if (p.style.display === 'block') renderPasswordConfig();
-  };
-  document.body.appendChild(toggleBtn);
+// Inject auth status bar
+function injectAuthBar() {
+  var bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;padding:6px 12px;background:#111;color:#fff;font-family:sans-serif;font-size:12px;border-bottom-left-radius:6px;';
+  bar.innerHTML = '<span id="authStatus"><span style="color:red;">● Not logged in</span></span>';
+  document.body.appendChild(bar);
 }
 
-function renderPasswordConfig() {
-  var container = document.getElementById('passwordConfigContent');
-  if (!container) return;
-
-  var html = '';
-  PASSWORD_CONFIG.passwords.forEach(function(entry, idx) {
-    html += '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-bottom:10px;">';
-    html += '  <div style="display:flex;gap:8px;margin-bottom:8px;">';
-    html += '    <input type="text" id="pw-label-' + idx + '" value="' + escapeHtml(entry.label) + '" placeholder="Label" style="flex:1;background:#1a1a2e;color:#fff;border:1px solid #333;border-radius:4px;padding:4px 8px;font-size:12px;">';
-    html += '    <input type="text" id="pw-pass-' + idx + '" value="' + escapeHtml(entry.password) + '" placeholder="Password" style="flex:1;background:#1a1a2e;color:#fff;border:1px solid #333;border-radius:4px;padding:4px 8px;font-size:12px;">';
-    html += '    <select id="pw-mode-' + idx + '" style="background:#1a1a2e;color:#fff;border:1px solid #333;border-radius:4px;padding:4px;font-size:12px;">';
-    html += '      <option value="allow"' + (entry.mode === 'allow' ? ' selected' : '') + '>Allow (whitelist)</option>';
-    html += '      <option value="deny"' + (entry.mode === 'deny' ? ' selected' : '') + '>Deny (blacklist)</option>';
-    html += '    </select>';
-    html += '  </div>';
-    html += '  <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Allowed Actions (comma-separated, empty=none for allow/all for deny):</div>';
-    html += '  <input type="text" id="pw-allow-' + idx + '" value="' + escapeHtml(entry.allowedActions.join(', ')) + '" placeholder="e.g. message, redirect, note" style="width:100%;background:#1a1a2e;color:#fff;border:1px solid #333;border-radius:4px;padding:4px 8px;font-size:12px;margin-bottom:6px;box-sizing:border-box;">';
-    html += '  <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Denied Actions (comma-separated):</div>';
-    html += '  <input type="text" id="pw-deny-' + idx + '" value="' + escapeHtml(entry.deniedActions.join(', ')) + '" placeholder="e.g. ban, delete, lockdown" style="width:100%;background:#1a1a2e;color:#fff;border:1px solid #333;border-radius:4px;padding:4px 8px;font-size:12px;box-sizing:border-box;">';
-    html += '  <button onclick="removePasswordEntry(' + idx + ')" style="margin-top:8px;background:#e94560;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:11px;">🗑 Remove</button>';
-    html += '</div>';
-  });
-
-  html += '<button onclick="addPasswordEntry()" style="width:100%;background:#533483;color:#fff;border:none;border-radius:4px;padding:8px;cursor:pointer;font-size:12px;margin-bottom:10px;">+ Add Password</button>';
-
-  html += '<div style="background:#0f3460;border-radius:8px;padding:12px;">';
-  html += '  <div style="font-size:12px;color:#e94560;font-weight:bold;margin-bottom:8px;">Global Settings</div>';
-  html += '  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
-  html += '    <label style="color:#aaa;font-size:12px;">Session Timeout (min, 0=none):</label>';
-  html += '    <input type="number" id="pw-timeout" value="' + PASSWORD_CONFIG.sessionTimeoutMinutes + '" style="width:60px;background:#1a1a2e;color:#fff;border:1px solid #333;border-radius:4px;padding:4px;font-size:12px;">';
-  html += '  </div>';
-  html += '  <div style="display:flex;align-items:center;gap:8px;">';
-  html += '    <label style="color:#aaa;font-size:12px;">Show blocked actions:</label>';
-  html += '    <input type="checkbox" id="pw-showblocked"' + (PASSWORD_CONFIG.showBlockedActions ? ' checked' : '') + ' style="accent-color:#e94560;">';
-  html += '  </div>';
-  html += '</div>';
-
-  html += '<div style="margin-top:10px;font-size:11px;color:#888;line-height:1.5;">';
-  html += '  <strong>Available actions:</strong> ban, unban, toggleBan, delete, redirect, message, image, effect, note, question, timeout, untimeout, banAll, unbanAll, deleteAll, redirectAll, messageAll, askAll, showIdAll, sendImageAll, lockdown, rickroll<br><br>';
-  html += '  <strong>Allow mode:</strong> Only listed actions are permitted (empty = view-only)<br>';
-  html += '  <strong>Deny mode:</strong> All actions permitted except listed ones (empty = full access)';
-  html += '</div>';
-
-  container.innerHTML = html;
-}
-
-function addPasswordEntry() {
-  PASSWORD_CONFIG.passwords.push({
-    password: "newpass",
-    label: "New User",
-    mode: "deny",
-    allowedActions: [],
-    deniedActions: []
-  });
-  renderPasswordConfig();
-}
-
-function removePasswordEntry(idx) {
-  if (PASSWORD_CONFIG.passwords.length <= 1) {
-    alert("You must keep at least one password.");
-    return;
-  }
-  PASSWORD_CONFIG.passwords.splice(idx, 1);
-  renderPasswordConfig();
-}
-
-function savePasswordConfig() {
-  var newPasswords = [];
-  var idx = 0;
-  while (document.getElementById('pw-label-' + idx)) {
-    var allowStr = document.getElementById('pw-allow-' + idx).value;
-    var denyStr = document.getElementById('pw-deny-' + idx).value;
-    newPasswords.push({
-      label: document.getElementById('pw-label-' + idx).value,
-      password: document.getElementById('pw-pass-' + idx).value,
-      mode: document.getElementById('pw-mode-' + idx).value,
-      allowedActions: allowStr ? allowStr.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [],
-      deniedActions: denyStr ? denyStr.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : []
-    });
-    idx++;
-  }
-
-  PASSWORD_CONFIG.passwords = newPasswords;
-  PASSWORD_CONFIG.sessionTimeoutMinutes = parseInt(document.getElementById('pw-timeout').value) || 0;
-  PASSWORD_CONFIG.showBlockedActions = document.getElementById('pw-showblocked').checked;
-
-  // Force re-auth since config changed
-  logout();
-  alert("Password config saved! You have been logged out. New settings take effect on next login.");
-  renderPasswordConfig();
-}
-
-function resetPasswordConfig() {
-  if (!confirm("Reset password config to defaults?")) return;
-  PASSWORD_CONFIG.passwords = [
-    { password: "1211", label: "Admin", mode: "deny", allowedActions: [], deniedActions: [] },
-    { password: "helper123", label: "Helper", mode: "deny", allowedActions: [], deniedActions: ["ban", "unban", "toggleBan", "delete", "deleteAll", "lockdown", "rickroll"] },
-    { password: "viewer", label: "Viewer", mode: "allow", allowedActions: [], deniedActions: [] }
-  ];
-  PASSWORD_CONFIG.sessionTimeoutMinutes = 30;
-  PASSWORD_CONFIG.showBlockedActions = true;
-  logout();
-  renderPasswordConfig();
-  alert("Config reset to defaults.");
-}
-
-// Inject UI when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', injectAuthUI);
+  document.addEventListener('DOMContentLoaded', injectAuthBar);
 } else {
-  injectAuthUI();
+  injectAuthBar();
 }
+
+setInterval(updateAuthStatus, 30000);
