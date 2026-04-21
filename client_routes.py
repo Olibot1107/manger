@@ -336,22 +336,6 @@ def register_routes(app, state):
 
         return redirect(url_for("clients_index"))
 
-    @app.route("/clients/forceurl", methods=["POST"])
-    def set_force_url():
-        username = request.form.get("username", "").strip()
-        url = request.form.get("url", "").strip()
-
-        if username:
-            with data_lock:
-                if url:
-                    clients.setdefault(username, {})["force_url"] = url
-                else:
-                    if username in clients and "force_url" in clients[username]:
-                        del clients[username]["force_url"]
-                save_json(clients_json_path, clients)
-
-        return redirect(url_for("clients_index"))
-
     @app.route("/clients/effect", methods=["POST"])
     def set_client_effect():
         username = request.form.get("username", "").strip()
@@ -553,7 +537,6 @@ def register_routes(app, state):
         return jsonify(
             {
                 "banned": status.get("banned", False),
-                "force_url": status.get("force_url"),
                 "redirect": redirect_url,
                 "image": image_b64,
                 "audio": audio_b64,
