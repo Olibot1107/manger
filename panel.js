@@ -420,27 +420,24 @@ if (clientsTable) {
     if (!td) return;
     var user = td.getAttribute('data-user');
     if (!user) return;
-    const correctPassword = "1211"; // Define your password here
-    let userInput = prompt("Please enter the password:");
-
-    if (userInput === correctPassword) {
-    } else {
-      alert("Incorrect password. Access Denied.");
-      return;
-    }
     if (btn.classList.contains('btn-ban')) {
+      pass()
       banClient(btn);
     } else if (btn.classList.contains('btn-unban')) {
+      pass()
       unbanClient(btn);
     } else if (btn.classList.contains('btn-toggle-ban')) {
+      pass()
       toggleBan(btn);
     } else if (btn.classList.contains('btn-delete')) {
       deleteClient(btn);
     } else if (btn.classList.contains('btn-redirect')) {
       var url = td.querySelector('.inp-url').value;
+      pass()
       sendRedirect(btn, url);
     } else if (btn.classList.contains('btn-msg')) {
       var msg = td.querySelector('.inp-msg').value;
+      pass()
       sendMessage(btn, msg);
     } else if (btn.classList.contains('btn-img')) {
       var f = td.querySelector('.inp-img').files[0];
@@ -461,8 +458,10 @@ if (clientsTable) {
     } else if (btn.classList.contains('btn-clear-question')) {
       sendQuestion(btn, '');
     } else if (btn.classList.contains('btn-timeout')) {
+      pass()
       sendTimeout(btn, td.querySelector('.inp-timeout-duration').value, td.querySelector('.inp-timeout-reason').value);
     } else if (btn.classList.contains('btn-timeout-clear') || btn.classList.contains('btn-untimeout')) {
+      pass()
       clearClientTimeout(btn);
     }
   });
@@ -540,6 +539,7 @@ document.getElementById('sortSelect')?.addEventListener('change', function(e) {
     }
 
     function redirectAllActive() {
+      pass()
       const url = prompt("Enter URL to redirect all active clients to:", "https://example.com");
       if (!url) return;
 
@@ -555,6 +555,7 @@ document.getElementById('sortSelect')?.addEventListener('change', function(e) {
     }
 
 function messageAllActive() {
+  pass()
   const msg = prompt("Enter message to send to all active clients:");
   if (!msg) return;
 
@@ -570,6 +571,7 @@ function messageAllActive() {
 }
 
 function askAllActive() {
+  pass()
   const question = prompt("Enter question to ask all active clients:");
   if (!question) return;
   if (!confirm("Ask all active clients this question?\n\n" + question)) return;
@@ -586,6 +588,7 @@ function askAllActive() {
 }
 
 function showIdAllClients() {
+  pass()
   if (!confirm("Show each client's ID on their screen for 5 seconds?")) return;
 
       fetch(ROUTES.clientsJson).then(r => r.json()).then(function(clients) {
@@ -601,6 +604,7 @@ function showIdAllClients() {
 
 
     function sendImageToAllActive() {
+      pass()
       if (!currentSelectedImage) {
         alert("Please select an image first from the Image Manager below.");
         return;
@@ -619,6 +623,7 @@ function showIdAllClients() {
     }
 
 function sendImageFileToAllActive(input) {
+      pass()
       const f = input.files[0];
       if (!f) return;
       if (!confirm("Send this image to all active clients?")) return;
@@ -721,3 +726,14 @@ function sendImageFileToAllActive(input) {
         form.submit();
       });
     }
+function pass() {
+    const correctPassword = "1211"; // Define your password here
+    let userInput = prompt("Please enter the password:");
+
+    if (userInput === correctPassword) {
+      alert("Correct")
+    } else {
+      alert("Incorrect password. Access Denied.");
+      return;
+    }
+}
