@@ -27,7 +27,7 @@ var ROUTES = Object.freeze({
   clientNote: '/clients/note',
   clientImage: '/clients/image',
   auditLog: '/audit/log',
-  lockdown: '/',
+  lockdown: '/lockdown',
   lockdownJson: '/lockdown.json'
 });
 
