@@ -10,14 +10,6 @@ function init() {
   updateLockdownBtn();
   setInterval(updateLockdownBtn, 30000);
 
-  // Load polls (admin panel only)
-  if (typeof loadActivePolls === 'function') {
-    loadActivePolls();
-    loadPollResults();
-    setInterval(loadActivePolls, 10000);
-    setInterval(loadPollResults, 15000);
-  }
-
   // Show initial auth state (not logged in) immediately
   updateAuthStatus();
 
