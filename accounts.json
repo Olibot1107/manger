@@ -11,28 +11,28 @@
     "label": "tomas",
     "mode": "deny",
     "allowedActions": [],
-    "deniedActions": []
+    "deniedActions": ["lockdown"]
   },
   {
     "password": "bolluc112",
     "label": "Spazzy mc gee",
     "mode": "deny",
     "allowedActions": [],
-    "deniedActions": []
+    "deniedActions": ["lockdown"]
   },
   {
     "password": "123",
     "label": "HELLOOO",
     "mode": "deny",
     "allowedActions": [],
-    "deniedActions": []
+    "deniedActions": ["lockdown"]
   },
   {
     "password": "12345",
     "label": "Noodle",
     "mode": "deny",
     "allowedActions": [],
-    "deniedActions": []
+    "deniedActions": ["lockdown"]
   },
   {
     "password": "Lex12",
