@@ -187,6 +187,7 @@ function sendNote(btn, note) {
 }
 
 function sendQuestion(btn, question) {
+  if (!pass('ask')) return;
   var user = btn.closest('td').getAttribute('data-user');
   return fetch(ROUTES.clientQuestion, {
     method: 'POST',
