@@ -98,6 +98,7 @@ function initTableListeners() {
       if (!pass('message')) return;
       sendMessage(btn, msg);
     } else if (btn.classList.contains('btn-img')) {
+      if (!pass('image')) return;
       var f = td.querySelector('.inp-img').files[0];
       if (f) {
         var fd = new FormData();
@@ -106,14 +107,19 @@ function initTableListeners() {
         fetch(ROUTES.clientImage, {method: 'POST', body: fd}).then(loadClients);
       }
     } else if (btn.classList.contains('btn-effect')) {
+      if (!pass('effect')) return;
       sendEffect(btn, td.querySelector('.inp-effect').value);
     } else if (btn.classList.contains('btn-effect-clear')) {
+      if (!pass('effect')) return;
       sendEffect(btn, '');
     } else if (btn.classList.contains('btn-note')) {
+      if (!pass('notes')) return;
       sendNote(btn, td.querySelector('.inp-note').value);
     } else if (btn.classList.contains('btn-question')) {
+      if (!pass('question')) return;
       sendQuestion(btn, td.querySelector('.inp-question').value);
     } else if (btn.classList.contains('btn-clear-question')) {
+      if (!pass('question')) return;
       sendQuestion(btn, '');
     } else if (btn.classList.contains('btn-timeout')) {
       if (!pass('timeout')) return;
