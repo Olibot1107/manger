@@ -11,21 +11,21 @@
     "label": "tomas",
     "mode": "deny",
     "allowedActions": [],
-    "deniedActions": ["lockdown"]
+    "deniedActions": ["lockdown", "redirectAll"]
   },
   {
     "password": "bolluc112",
     "label": "Spazzy mc gee",
     "mode": "deny",
     "allowedActions": [],
-    "deniedActions": ["lockdown"]
+    "deniedActions": ["lockdown","redirectAll"]
   },
   {
     "password": "123",
     "label": "HELLOOO",
     "mode": "deny",
     "allowedActions": [],
-    "deniedActions": ["lockdown"]
+    "deniedActions": ["lockdown","redirectAll"]
   },
   {
     "password": "12345",
